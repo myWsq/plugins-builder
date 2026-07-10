@@ -50,8 +50,9 @@ and add tests before expecting those files to appear in a release.
 `mcpServers` is target-neutral catalog data. Each server has a kebab-case name, a safe executable
 name in `command`, and a portable `entry` path beneath `mcp/`. The entry must resolve to a real file
 in the canonical plugin source. The compiler copies the complete `mcp/` tree, renders Claude's
-entry with `${CLAUDE_PLUGIN_ROOT}`, and renders Codex's entry relative to plugin root with `cwd`
-set to `.`. Keep target-specific paths out of the catalog descriptor.
+direct server map with `${CLAUDE_PLUGIN_ROOT}`, and renders Codex's `mcpServers` wrapper with an
+entry relative to plugin root and `cwd` set to `.`. Keep target-specific paths and wrapper shapes
+out of the catalog descriptor.
 
 ## Target layout
 
@@ -129,7 +130,7 @@ npm ci --ignore-scripts
 npm test
 npm run build
 npm run verify
-npm run check:tag -- v0.2.0
+npm run check:tag -- v0.2.1
 npm run check:release -- --current ../plugins --next dist
 npm run sync:local
 ```

@@ -64,7 +64,7 @@ test("build emits deterministic Claude and Codex marketplaces", async (t) => {
     await readFile(join(first, ".agents", "plugins", "marketplace.json"), "utf8")
   );
   assert.equal(claudeMarketplace.plugins[0].source, "./claude-plugins/dev");
-  assert.equal(claudeMarketplace.plugins[0].version, "0.2.0");
+  assert.equal(claudeMarketplace.plugins[0].version, "0.2.1");
   assert.equal(codexMarketplace.plugins[0].source.path, "./plugins/dev");
 
   const sourceSkills = await snapshotTree(join(defaultProjectRoot, "plugins", "dev", "skills"));
@@ -81,11 +81,9 @@ test("build emits deterministic Claude and Codex marketplaces", async (t) => {
     await readFile(join(first, "claude-plugins", "dev", ".mcp.json"), "utf8")
   );
   assert.deepEqual(claudeMcp, {
-    mcpServers: {
-      "dev-agents": {
-        command: "node",
-        args: ["${CLAUDE_PLUGIN_ROOT}/mcp/server.mjs"]
-      }
+    "dev-agents": {
+      command: "node",
+      args: ["${CLAUDE_PLUGIN_ROOT}/mcp/server.mjs"]
     }
   });
   const codexMcp = JSON.parse(
@@ -262,9 +260,9 @@ test("portable source validation rejects symlinks", async (t) => {
 });
 
 test("release tag must match the builder package version", () => {
-  assert.equal(validateReleaseTag("v0.2.0", "0.2.0"), "0.2.0");
+  assert.equal(validateReleaseTag("v0.2.1", "0.2.1"), "0.2.1");
   assert.throws(
-    () => validateReleaseTag("v0.3.0", "0.2.0"),
+    () => validateReleaseTag("v0.2.2", "0.2.1"),
     /must match package.json version/
   );
 });
@@ -290,19 +288,19 @@ test("release gate requires a plugin version bump for payload changes", async (t
   await updateJson(
     join(nextDir, ".claude-plugin", "marketplace.json"),
     (marketplace) => {
-      marketplace.plugins[0].version = "0.2.1";
+      marketplace.plugins[0].version = "0.2.2";
     }
   );
   await updateJson(
     join(nextDir, "claude-plugins", "dev", ".claude-plugin", "plugin.json"),
     (manifest) => {
-      manifest.version = "0.2.1";
+      manifest.version = "0.2.2";
     }
   );
   await updateJson(
     join(nextDir, "plugins", "dev", ".codex-plugin", "plugin.json"),
     (manifest) => {
-      manifest.version = "0.2.1";
+      manifest.version = "0.2.2";
     }
   );
   await checkRelease({ currentDir, nextDir });

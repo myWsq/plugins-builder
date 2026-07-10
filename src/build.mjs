@@ -199,7 +199,7 @@ function mcpConfig(plugin, target) {
       ...(target === "codex" ? { cwd: "." } : {})
     };
   }
-  return { mcpServers };
+  return target === "claude" ? mcpServers : { mcpServers };
 }
 
 function parseArgs(argv) {

@@ -31,8 +31,8 @@ dist/                     Generated marketplace tree
 ```
 
 The compiler emits separate Claude and Codex plugin bundles from the same canonical source. A
-neutral `mcpServers` descriptor becomes target-specific `.mcp.json`: both targets use the
-compatible `mcpServers` wrapper, Claude entries use `${CLAUDE_PLUGIN_ROOT}`, and Codex entries use
+neutral `mcpServers` descriptor becomes target-specific `.mcp.json`: Claude uses a direct server
+map with `${CLAUDE_PLUGIN_ROOT}`, while Codex uses the compatible `mcpServers` wrapper plus
 plugin-relative paths with `cwd` set to `.`. This lets the bundled dev plugin expose one MCP-backed
 entry point for local-agent delegation while platform-specific app, hook, and authentication
 configuration can evolve independently.
