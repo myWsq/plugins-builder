@@ -1,0 +1,12 @@
+{
+  "name": "plugins",
+  "displayName": "WSQ Plugins",
+  "description": "A personal marketplace of reusable skills, MCP integrations, and agent workflows.",
+  "owner": {
+    "name": "Shuaiqi Wang",
+    "email": "wsq961@outlook.com"
+  },
+  "plugins": [
+    "dev"
+  ]
+}

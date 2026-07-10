@@ -1,0 +1,90 @@
+name: release-marketplace
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: plugins-marketplace-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out builder
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+      - name: Validate release tag
+        run: npm run check:tag -- "${GITHUB_REF_NAME}"
+      - id: source
+        name: Resolve tagged source revision
+        run: |
+          source_revision="$(git rev-list -n 1 "${GITHUB_REF_NAME}")"
+          echo "sha=${source_revision}" >> "${GITHUB_OUTPUT}"
+      - name: Require tagged commit on main
+        env:
+          SOURCE_REVISION: ${{ steps.source.outputs.sha }}
+        run: |
+          if ! git merge-base --is-ancestor "${SOURCE_REVISION}" origin/main; then
+            echo "::error::Release tag must point to a commit on main"
+            exit 1
+          fi
+      - name: Verify and build
+        env:
+          SOURCE_REVISION: ${{ steps.source.outputs.sha }}
+        run: npm run verify
+      - name: Require publishing credential
+        env:
+          TOKEN: ${{ secrets.MARKETPLACE_REPO_TOKEN }}
+        run: |
+          if test -z "${TOKEN}"; then
+            echo "::error::Missing MARKETPLACE_REPO_TOKEN"
+            exit 1
+          fi
+      - name: Check out generated marketplace
+        uses: actions/checkout@v4
+        with:
+          repository: myWsq/plugins
+          ref: main
+          token: ${{ secrets.MARKETPLACE_REPO_TOKEN }}
+          path: release
+          persist-credentials: true
+      - name: Enforce plugin version contract
+        run: npm run check:release -- --current release --next dist
+      - name: Sync generated tree
+        run: node src/sync-local.mjs --target release
+      - name: Publish
+        working-directory: release
+        env:
+          SOURCE_REVISION: ${{ steps.source.outputs.sha }}
+        run: |
+          if test -z "$(git status --porcelain)"; then
+            exit 0
+          fi
+          git config user.name "plugins-release[bot]"
+          git config user.email "plugins-release[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "release: ${GITHUB_REF_NAME} from ${SOURCE_REVISION}"
+          git push origin HEAD:main
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            exit 0
+          fi
+          gh release create "${GITHUB_REF_NAME}" --verify-tag --generate-notes --title "${GITHUB_REF_NAME}"

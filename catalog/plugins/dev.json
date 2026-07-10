@@ -1,0 +1,51 @@
+{
+  "name": "dev",
+  "version": "0.1.0",
+  "displayName": "Dev Skills",
+  "description": "Plan-driven software development: explore and converge, write an implementation plan, then execute and review it.",
+  "shortDescription": "Explore, plan, execute, and review software changes.",
+  "longDescription": "Dev packages three plan-driven development skills: dev-explore maps the codebase and converges on a direction, dev-write-plan turns that direction into an outcome contract, and dev-execute-plan implements the plan and verifies the result.",
+  "author": {
+    "name": "Shuaiqi Wang",
+    "email": "wsq961@outlook.com",
+    "url": "https://github.com/myWsq"
+  },
+  "homepage": "https://github.com/myWsq/plugins",
+  "repository": "https://github.com/myWsq/plugins-builder",
+  "license": "MIT",
+  "keywords": [
+    "development-workflow",
+    "planning",
+    "skills",
+    "code-review"
+  ],
+  "capabilities": [
+    "Skills",
+    "Planning",
+    "Code Review"
+  ],
+  "defaultPrompt": [
+    "Use dev-explore to understand this codebase and converge on an approach.",
+    "Use dev-write-plan to turn this requirement into an implementation plan.",
+    "Use dev-execute-plan to implement and review the next TODO plan."
+  ],
+  "brandColor": "#2563EB",
+  "targets": {
+    "claude": {
+      "category": "development"
+    },
+    "codex": {
+      "category": "Developer Tools",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      }
+    }
+  },
+  "origin": {
+    "repository": "https://github.com/myWsq/dev-skills",
+    "revision": "c0633a0",
+    "includesWorkingTreeChanges": true,
+    "workingTreePatchSha256": "2a9747be1298ada7a092dd36a8002b83fe366e790bcb0c9f4d46e01c119a1cba"
+  }
+}

@@ -1,0 +1,4 @@
+dist/
+.plugins-build-*/
+node_modules/
+.DS_Store
