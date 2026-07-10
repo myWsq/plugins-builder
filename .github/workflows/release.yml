@@ -21,6 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -49,10 +50,10 @@ jobs:
         run: npm run verify
       - name: Require publishing credential
         env:
-          TOKEN: ${{ secrets.MARKETPLACE_REPO_TOKEN }}
+          DEPLOY_KEY: ${{ secrets.MARKETPLACE_REPO_SSH_KEY }}
         run: |
-          if test -z "${TOKEN}"; then
-            echo "::error::Missing MARKETPLACE_REPO_TOKEN"
+          if test -z "${DEPLOY_KEY}"; then
+            echo "::error::Missing MARKETPLACE_REPO_SSH_KEY"
             exit 1
           fi
       - name: Check out generated marketplace
@@ -60,7 +61,8 @@ jobs:
         with:
           repository: myWsq/plugins
           ref: main
-          token: ${{ secrets.MARKETPLACE_REPO_TOKEN }}
+          ssh-key: ${{ secrets.MARKETPLACE_REPO_SSH_KEY }}
+          ssh-strict: true
           path: release
           persist-credentials: true
       - name: Enforce plugin version contract

@@ -148,11 +148,12 @@ The release job is serialized and never force-pushes.
 
 - Create `myWsq/plugins` with a `main` branch and bootstrap it from a verified local
   `npm run sync:local` result. It must contain `.generated-by-plugins-builder`.
-- In `myWsq/plugins-builder`, configure the Actions secret `MARKETPLACE_REPO_TOKEN`.
-- Use a fine-grained token limited to `myWsq/plugins` with repository Contents read/write only.
-  Do not grant organization-wide or workflow-write access.
-- If the target branch has protection rules, allow the publishing bot/token to push, or replace the
-  token with a repository-scoped GitHub App that has the required bypass.
+- Add a dedicated SSH public key to `myWsq/plugins` as a write-enabled deploy key, and store its
+  private key in the `myWsq/plugins-builder` Actions secret `MARKETPLACE_REPO_SSH_KEY`.
+- Use this key only for `myWsq/plugins`; never reuse a personal SSH key or share it with another
+  repository.
+- If the target branch has protection rules, allow deploy-key pushes or replace the key with a
+  repository-scoped GitHub App that has the required bypass.
 - Protect release tags so only trusted maintainers can create `v*` tags.
 
 Do not initialize the target with hand-maintained README, workflows, CODEOWNERS, or other files.
@@ -166,7 +167,8 @@ Every target file outside `.git/` must be generated here.
   release version/tag.
 - Tag mismatch: delete the incorrect local tag if it was not published, correct
   `package.json.version`, and create the right tag. Never move a published release tag.
-- Target checkout or push failure: verify token scope, target `main`, and branch rules.
+- Target checkout or push failure: verify the deploy key, Actions secret, target `main`, and branch
+  rules.
 - Sync reports an unmanaged target: stop and verify the path. Never forge the generated marker or
   delete an unknown repository to bypass the guard.
 - No generated diff: treat the publish step as a successful no-op.

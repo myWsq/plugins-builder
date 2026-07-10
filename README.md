@@ -40,6 +40,7 @@ Pull requests and `main` pushes run verification only. A `vX.Y.Z` tag runs the r
 4. The generated tree is synchronized to `myWsq/plugins@main`.
 5. The workflow creates the matching GitHub Release.
 
-The target repository is written with a fine-grained `MARKETPLACE_REPO_TOKEN` secret scoped only
-to `myWsq/plugins` with Contents read/write permission. See [AGENTS.md](AGENTS.md) for the full
-source, version, bootstrap, and failure-handling contract.
+The target repository is written with a dedicated SSH deploy key. Its public key is a write-enabled
+deploy key on `myWsq/plugins`; its private key is stored in the builder's
+`MARKETPLACE_REPO_SSH_KEY` Actions secret. See [AGENTS.md](AGENTS.md) for the full source, version,
+bootstrap, and failure-handling contract.
