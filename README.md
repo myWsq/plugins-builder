@@ -24,13 +24,18 @@ catalog/                  Marketplace and plugin metadata
 docs/                     Free-form marketplace documentation
 MARKET_README.md           Source for the generated marketplace README
 plugins/<name>/skills/    Canonical skill source
+plugins/<name>/mcp/       Canonical local-agent MCP runtime
 src/                      Build and local-sync tooling
 test/                     Determinism and safety tests
 dist/                     Generated marketplace tree
 ```
 
-The compiler emits separate Claude and Codex plugin bundles from the same canonical source so
-platform-specific MCP, app, hook, and authentication configuration can evolve independently.
+The compiler emits separate Claude and Codex plugin bundles from the same canonical source. A
+neutral `mcpServers` descriptor becomes target-specific `.mcp.json`: both targets use the
+compatible `mcpServers` wrapper, Claude entries use `${CLAUDE_PLUGIN_ROOT}`, and Codex entries use
+plugin-relative paths with `cwd` set to `.`. This lets the bundled dev plugin expose one MCP-backed
+entry point for local-agent delegation while platform-specific app, hook, and authentication
+configuration can evolve independently.
 `MARKET_README.md` and `docs/` are copied verbatim to the generated marketplace root. They are not
 duplicated inside installable plugin bundles.
 

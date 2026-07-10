@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { cp, lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -64,6 +64,7 @@ test("build emits deterministic Claude and Codex marketplaces", async (t) => {
     await readFile(join(first, ".agents", "plugins", "marketplace.json"), "utf8")
   );
   assert.equal(claudeMarketplace.plugins[0].source, "./claude-plugins/dev");
+  assert.equal(claudeMarketplace.plugins[0].version, "0.2.0");
   assert.equal(codexMarketplace.plugins[0].source.path, "./plugins/dev");
 
   const sourceSkills = await snapshotTree(join(defaultProjectRoot, "plugins", "dev", "skills"));
@@ -72,6 +73,33 @@ test("build emits deterministic Claude and Codex marketplaces", async (t) => {
     sourceSkills
   );
   assert.deepEqual(await snapshotTree(join(first, "plugins", "dev", "skills")), sourceSkills);
+  const sourceMcp = await snapshotTree(join(defaultProjectRoot, "plugins", "dev", "mcp"));
+  assert.deepEqual(await snapshotTree(join(first, "claude-plugins", "dev", "mcp")), sourceMcp);
+  assert.deepEqual(await snapshotTree(join(first, "plugins", "dev", "mcp")), sourceMcp);
+
+  const claudeMcp = JSON.parse(
+    await readFile(join(first, "claude-plugins", "dev", ".mcp.json"), "utf8")
+  );
+  assert.deepEqual(claudeMcp, {
+    mcpServers: {
+      "dev-agents": {
+        command: "node",
+        args: ["${CLAUDE_PLUGIN_ROOT}/mcp/server.mjs"]
+      }
+    }
+  });
+  const codexMcp = JSON.parse(
+    await readFile(join(first, "plugins", "dev", ".mcp.json"), "utf8")
+  );
+  assert.deepEqual(codexMcp, {
+    mcpServers: {
+      "dev-agents": {
+        command: "node",
+        args: ["./mcp/server.mjs"],
+        cwd: "."
+      }
+    }
+  });
   assert.deepEqual(
     await snapshotTree(join(first, "docs")),
     await snapshotTree(join(defaultProjectRoot, "docs"))
@@ -88,12 +116,15 @@ test("build emits deterministic Claude and Codex marketplaces", async (t) => {
   await assert.rejects(readFile(join(first, "plugins", "dev", "README.md")), {
     code: "ENOENT"
   });
-  assert.equal(
-    JSON.parse(
-      await readFile(join(first, "plugins", "dev", ".codex-plugin", "plugin.json"), "utf8")
-    ).skills,
-    "./skills/"
+  const claudeManifest = JSON.parse(
+    await readFile(join(first, "claude-plugins", "dev", ".claude-plugin", "plugin.json"), "utf8")
   );
+  assert.equal(claudeManifest.mcpServers, undefined);
+  const codexManifest = JSON.parse(
+    await readFile(join(first, "plugins", "dev", ".codex-plugin", "plugin.json"), "utf8")
+  );
+  assert.equal(codexManifest.skills, "./skills/");
+  assert.equal(codexManifest.mcpServers, "./.mcp.json");
 });
 
 test("build removes stale generated files", async (t) => {
@@ -149,6 +180,79 @@ test("descriptor validation rejects invalid semver", () => {
   );
 });
 
+test("descriptor validation rejects unsafe MCP names and entries", async () => {
+  const descriptor = JSON.parse(
+    await readFile(join(defaultProjectRoot, "catalog", "plugins", "dev.json"), "utf8")
+  );
+  assert.throws(
+    () =>
+      validatePluginDescriptor({
+        ...descriptor,
+        mcpServers: {
+          "../dev-agents": {
+            command: "node",
+            entry: "mcp/server.mjs"
+          }
+        }
+      }),
+    /unsafe server name/
+  );
+  assert.throws(
+    () =>
+      validatePluginDescriptor({
+        ...descriptor,
+        mcpServers: {
+          "dev-agents": {
+            command: "node --inspect",
+            entry: "mcp/server.mjs"
+          }
+        }
+      }),
+    /safe executable name/
+  );
+
+  for (const entry of [
+    "/mcp/server.mjs",
+    "../mcp/server.mjs",
+    "mcp/../server.mjs",
+    "mcp\\server.mjs",
+    "scripts/server.mjs"
+  ]) {
+    assert.throws(
+      () =>
+        validatePluginDescriptor({
+          ...descriptor,
+          mcpServers: {
+            "dev-agents": {
+              command: "node",
+              entry
+            }
+          }
+        }),
+      /safe relative path under mcp\//
+    );
+  }
+});
+
+test("build rejects a missing MCP source entry", async (t) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-mcp-source-"));
+  t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const projectRoot = join(temporaryRoot, "project");
+  await mkdir(projectRoot, { recursive: true });
+  await cp(join(defaultProjectRoot, "catalog"), join(projectRoot, "catalog"), { recursive: true });
+  await cp(join(defaultProjectRoot, "docs"), join(projectRoot, "docs"), { recursive: true });
+  await cp(join(defaultProjectRoot, "plugins"), join(projectRoot, "plugins"), { recursive: true });
+  for (const file of ["LICENSE", "MARKET_README.md", "package.json"]) {
+    await cp(join(defaultProjectRoot, file), join(projectRoot, file));
+  }
+  await rm(join(projectRoot, "plugins", "dev", "mcp", "server.mjs"), { force: true });
+
+  await assert.rejects(
+    build({ projectRoot, outDir: join(temporaryRoot, "dist") }),
+    /MCP server dev-agents entry does not exist: mcp\/server\.mjs/
+  );
+});
+
 test("portable source validation rejects symlinks", async (t) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-link-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
@@ -158,9 +262,9 @@ test("portable source validation rejects symlinks", async (t) => {
 });
 
 test("release tag must match the builder package version", () => {
-  assert.equal(validateReleaseTag("v0.1.0", "0.1.0"), "0.1.0");
+  assert.equal(validateReleaseTag("v0.2.0", "0.2.0"), "0.2.0");
   assert.throws(
-    () => validateReleaseTag("v0.2.0", "0.1.0"),
+    () => validateReleaseTag("v0.3.0", "0.2.0"),
     /must match package.json version/
   );
 });
@@ -186,19 +290,19 @@ test("release gate requires a plugin version bump for payload changes", async (t
   await updateJson(
     join(nextDir, ".claude-plugin", "marketplace.json"),
     (marketplace) => {
-      marketplace.plugins[0].version = "0.1.1";
+      marketplace.plugins[0].version = "0.2.1";
     }
   );
   await updateJson(
     join(nextDir, "claude-plugins", "dev", ".claude-plugin", "plugin.json"),
     (manifest) => {
-      manifest.version = "0.1.1";
+      manifest.version = "0.2.1";
     }
   );
   await updateJson(
     join(nextDir, "plugins", "dev", ".codex-plugin", "plugin.json"),
     (manifest) => {
-      manifest.version = "0.1.1";
+      manifest.version = "0.2.1";
     }
   );
   await checkRelease({ currentDir, nextDir });

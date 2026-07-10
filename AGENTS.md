@@ -18,10 +18,11 @@ verified release tag, and let GitHub Actions replace the generated snapshot.
 Authoritative source:
 
 - `catalog/marketplace.json`: marketplace identity and ordered plugin list.
-- `catalog/plugins/<name>.json`: neutral plugin metadata, plugin version, target policy, and origin.
+- `catalog/plugins/<name>.json`: neutral plugin metadata, plugin version, target policy, MCP server
+  descriptors, and origin.
 - `docs/`: free-form marketplace documentation copied verbatim to the release.
 - `MARKET_README.md`: hand-maintained source for the published marketplace `README.md`.
-- `plugins/<name>/`: canonical plugin content.
+- `plugins/<name>/`: canonical plugin content, including skills and MCP runtime source.
 - `src/`: build, release-gate, tag, and local-sync tooling.
 - `test/`: deterministic-build and safety tests.
 - `.github/workflows/`: verification and release automation.
@@ -40,11 +41,17 @@ Generated content:
 content but preserves the target repository's `.git/`. Never point the build command directly at
 a Git repository root.
 
-The current compiler ships `skills/` in both plugin targets and copies `docs/` plus
-`MARKET_README.md` to the release root. Documentation has no catalog schema or required
-per-plugin layout. Adding MCP, apps, hooks, commands, agents, or other components is compiler work:
-extend the neutral descriptor, render the platform-specific files, and add tests before expecting
-those files to appear in a release.
+The current compiler ships `skills/` and descriptor-declared `mcp/` runtime files in both plugin
+targets, then copies `docs/` plus `MARKET_README.md` to the release root. Documentation has no
+catalog schema or required per-plugin layout. Adding apps, hooks, commands, agents, or other new
+components is compiler work: extend the neutral descriptor, render the platform-specific files,
+and add tests before expecting those files to appear in a release.
+
+`mcpServers` is target-neutral catalog data. Each server has a kebab-case name, a safe executable
+name in `command`, and a portable `entry` path beneath `mcp/`. The entry must resolve to a real file
+in the canonical plugin source. The compiler copies the complete `mcp/` tree, renders Claude's
+entry with `${CLAUDE_PLUGIN_ROOT}`, and renders Codex's entry relative to plugin root with `cwd`
+set to `.`. Keep target-specific paths out of the catalog descriptor.
 
 ## Target layout
 
@@ -56,10 +63,14 @@ dist/
 ├── .agents/plugins/marketplace.json
 ├── docs/...
 ├── claude-plugins/<name>/
+│   ├── .mcp.json
 │   ├── .claude-plugin/plugin.json
+│   ├── mcp/
 │   └── skills/
 └── plugins/<name>/
+    ├── .mcp.json
     ├── .codex-plugin/plugin.json
+    ├── mcp/
     └── skills/
 ```
 
@@ -70,7 +81,8 @@ The two bundles are generated from one canonical source. Do not use symlinks in 
 1. Choose a kebab-case plugin name. The catalog name, descriptor `name`, and directory name must
    match exactly.
 2. Add or update canonical content under `plugins/<name>/`.
-3. Add or update `catalog/plugins/<name>.json`.
+3. Add or update `catalog/plugins/<name>.json`. For MCP servers, declare only the neutral
+   `command` and `entry`; do not hand-author target `.mcp.json` files.
 4. Update `docs/` and `MARKET_README.md` when marketplace-facing documentation changes.
 5. Add a new plugin name to `catalog/marketplace.json.plugins` in desired display order.
 6. Bump that plugin's strict-semver descriptor `version` whenever its shipped payload, generated
@@ -110,9 +122,6 @@ Normal release preparation:
    updates the builder version, creates the release commit, and creates `vX.Y.Z`.
 5. Push the branch and tag with `git push origin main --follow-tags`.
 
-For the initial existing `0.1.0` version, create `v0.1.0` on the verified initial commit instead
-of running `npm version` again.
-
 ## Commands
 
 ```bash
@@ -120,12 +129,13 @@ npm ci --ignore-scripts
 npm test
 npm run build
 npm run verify
-npm run check:tag -- v0.1.0
+npm run check:tag -- v0.2.0
 npm run check:release -- --current ../plugins --next dist
 npm run sync:local
 ```
 
-- `npm test`: deterministic-build, stale-file, sync-safety, version, and release-gate tests.
+- `npm test`: deterministic-build, MCP rendering/source validation, stale-file, sync-safety,
+  version, and release-gate tests.
 - `npm run build`: rebuild `dist/`; local `sourceRevision` defaults to `working-tree`.
 - `npm run verify`: run tests, then build the real catalog.
 - `npm run check:tag`: require the release tag to match `package.json.version`.
@@ -189,6 +199,8 @@ Every target file outside `.git/` must be generated here.
 ## Definition of done
 
 - Catalog, descriptor, directory name, and generated manifest names agree.
+- Descriptor-declared MCP entries exist, and both target bundles contain the runtime plus their
+  target-specific `.mcp.json` configuration.
 - Every changed plugin has a strictly greater version.
 - `npm run verify` passes.
 - Both Claude and Codex bundles contain the intended real files.

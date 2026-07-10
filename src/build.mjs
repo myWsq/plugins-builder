@@ -7,6 +7,8 @@ const modulePath = fileURLToPath(import.meta.url);
 export const defaultProjectRoot = resolve(dirname(modulePath), "..");
 
 const NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const COMMAND_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+const PORTABLE_PATH_SEGMENT_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 const CODEX_INSTALLATION = new Set(["NOT_AVAILABLE", "AVAILABLE", "INSTALLED_BY_DEFAULT"]);
 const CODEX_AUTHENTICATION = new Set(["ON_INSTALL", "ON_USE"]);
 
@@ -52,6 +54,20 @@ function requireString(value, field) {
   invariant(typeof value === "string" && value.trim() !== "", `${field} must be a non-empty string`);
 }
 
+function validateMcpEntry(entry, field) {
+  requireString(entry, field);
+  const segments = entry.split("/");
+  invariant(
+    entry.startsWith("mcp/") &&
+      !entry.includes("\\") &&
+      segments.every(
+        (segment) =>
+          segment !== "." && segment !== ".." && PORTABLE_PATH_SEGMENT_PATTERN.test(segment)
+      ),
+    `${field} must be a safe relative path under mcp/`
+  );
+}
+
 export function validatePluginDescriptor(plugin, expectedName = plugin?.name) {
   invariant(plugin && typeof plugin === "object" && !Array.isArray(plugin), "plugin descriptor must be an object");
   requireString(plugin.name, "plugin.name");
@@ -71,6 +87,33 @@ export function validatePluginDescriptor(plugin, expectedName = plugin?.name) {
   for (const [index, prompt] of plugin.defaultPrompt.entries()) {
     requireString(prompt, `${plugin.name}.defaultPrompt[${index}]`);
     invariant(prompt.length <= 128, `${plugin.name}.defaultPrompt[${index}] exceeds 128 characters`);
+  }
+
+  if (plugin.mcpServers !== undefined) {
+    invariant(
+      plugin.mcpServers &&
+        typeof plugin.mcpServers === "object" &&
+        !Array.isArray(plugin.mcpServers),
+      `${plugin.name}.mcpServers must be an object`
+    );
+    const mcpServers = Object.entries(plugin.mcpServers);
+    invariant(mcpServers.length > 0, `${plugin.name}.mcpServers must be non-empty`);
+    for (const [serverName, server] of mcpServers) {
+      invariant(
+        NAME_PATTERN.test(serverName),
+        `${plugin.name}.mcpServers contains unsafe server name: ${serverName}`
+      );
+      invariant(
+        server && typeof server === "object" && !Array.isArray(server),
+        `${plugin.name}.mcpServers.${serverName} must be an object`
+      );
+      requireString(server.command, `${plugin.name}.mcpServers.${serverName}.command`);
+      invariant(
+        COMMAND_PATTERN.test(server.command),
+        `${plugin.name}.mcpServers.${serverName}.command must be a safe executable name`
+      );
+      validateMcpEntry(server.entry, `${plugin.name}.mcpServers.${serverName}.entry`);
+    }
   }
 
   const policy = plugin.targets.codex.policy;
@@ -115,7 +158,7 @@ function claudePluginManifest(plugin) {
 }
 
 function codexPluginManifest(plugin) {
-  return {
+  const manifest = {
     name: plugin.name,
     version: plugin.version,
     description: plugin.description,
@@ -137,6 +180,26 @@ function codexPluginManifest(plugin) {
       brandColor: plugin.brandColor
     }
   };
+  if (plugin.mcpServers) {
+    manifest.mcpServers = "./.mcp.json";
+  }
+  return manifest;
+}
+
+function mcpConfig(plugin, target) {
+  const mcpServers = {};
+  for (const [name, server] of Object.entries(plugin.mcpServers).sort(([left], [right]) =>
+    left.localeCompare(right)
+  )) {
+    const entry =
+      target === "claude" ? `\${CLAUDE_PLUGIN_ROOT}/${server.entry}` : `./${server.entry}`;
+    mcpServers[name] = {
+      command: server.command,
+      args: [entry],
+      ...(target === "codex" ? { cwd: "." } : {})
+    };
+  }
+  return { mcpServers };
 }
 
 function parseArgs(argv) {
@@ -192,6 +255,22 @@ export async function build({
     const sourceRoot = join(projectRoot, "plugins", name);
     await assertPortableTree(sourceRoot);
     invariant(await pathExists(join(sourceRoot, "skills")), `Plugin ${name} must contain skills/`);
+    if (plugin.mcpServers) {
+      const mcpRoot = join(sourceRoot, "mcp");
+      invariant(await pathExists(mcpRoot), `Plugin ${name} declares MCP servers but has no mcp/`);
+      for (const [serverName, server] of Object.entries(plugin.mcpServers)) {
+        const entryPath = join(sourceRoot, server.entry);
+        invariant(
+          await pathExists(entryPath),
+          `Plugin ${name} MCP server ${serverName} entry does not exist: ${server.entry}`
+        );
+        const entryStat = await lstat(entryPath);
+        invariant(
+          entryStat.isFile(),
+          `Plugin ${name} MCP server ${serverName} entry must be a file: ${server.entry}`
+        );
+      }
+    }
     plugins.push(plugin);
   }
 
@@ -213,6 +292,12 @@ export async function build({
       await mkdir(join(codexRoot, ".codex-plugin"), { recursive: true });
       await cp(join(sourceRoot, "skills"), join(claudeRoot, "skills"), { recursive: true });
       await cp(join(sourceRoot, "skills"), join(codexRoot, "skills"), { recursive: true });
+      if (plugin.mcpServers) {
+        await cp(join(sourceRoot, "mcp"), join(claudeRoot, "mcp"), { recursive: true });
+        await cp(join(sourceRoot, "mcp"), join(codexRoot, "mcp"), { recursive: true });
+        await writeJson(join(claudeRoot, ".mcp.json"), mcpConfig(plugin, "claude"));
+        await writeJson(join(codexRoot, ".mcp.json"), mcpConfig(plugin, "codex"));
+      }
       await cp(join(projectRoot, "LICENSE"), join(claudeRoot, "LICENSE"));
       await cp(join(projectRoot, "LICENSE"), join(codexRoot, "LICENSE"));
       await writeJson(join(claudeRoot, ".claude-plugin", "plugin.json"), claudePluginManifest(plugin));
