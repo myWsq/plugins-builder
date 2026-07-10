@@ -19,6 +19,8 @@ Authoritative source:
 
 - `catalog/marketplace.json`: marketplace identity and ordered plugin list.
 - `catalog/plugins/<name>.json`: neutral plugin metadata, plugin version, target policy, and origin.
+- `docs/`: free-form marketplace documentation copied verbatim to the release.
+- `MARKET_README.md`: hand-maintained source for the published marketplace `README.md`.
 - `plugins/<name>/`: canonical plugin content.
 - `src/`: build, release-gate, tag, and local-sync tooling.
 - `test/`: deterministic-build and safety tests.
@@ -27,6 +29,9 @@ Authoritative source:
 Generated content:
 
 - `dist/`: disposable local build output; ignored by Git.
+- `dist/docs/`: copied marketplace documentation, emitted once rather than bundled in each target
+  plugin.
+- `dist/README.md`: byte-for-byte copy of `MARKET_README.md`.
 - `../plugins/`: local checkout of the generated marketplace; everything except `.git/` is owned
   by this builder.
 - `myWsq/plugins@main`: published generated snapshot; the release workflow owns it.
@@ -35,9 +40,11 @@ Generated content:
 content but preserves the target repository's `.git/`. Never point the build command directly at
 a Git repository root.
 
-The current compiler ships `skills/`. Adding MCP, apps, hooks, commands, agents, or other
-components is compiler work: extend the neutral descriptor, render the platform-specific files,
-and add tests before expecting those files to appear in a release.
+The current compiler ships `skills/` in both plugin targets and copies `docs/` plus
+`MARKET_README.md` to the release root. Documentation has no catalog schema or required
+per-plugin layout. Adding MCP, apps, hooks, commands, agents, or other components is compiler work:
+extend the neutral descriptor, render the platform-specific files, and add tests before expecting
+those files to appear in a release.
 
 ## Target layout
 
@@ -47,6 +54,7 @@ Each source plugin produces two real bundles:
 dist/
 ├── .claude-plugin/marketplace.json
 ├── .agents/plugins/marketplace.json
+├── docs/...
 ├── claude-plugins/<name>/
 │   ├── .claude-plugin/plugin.json
 │   └── skills/
@@ -63,12 +71,13 @@ The two bundles are generated from one canonical source. Do not use symlinks in 
    match exactly.
 2. Add or update canonical content under `plugins/<name>/`.
 3. Add or update `catalog/plugins/<name>.json`.
-4. Add a new plugin name to `catalog/marketplace.json.plugins` in desired display order.
-5. Bump that plugin's strict-semver descriptor `version` whenever its shipped payload, generated
+4. Update `docs/` and `MARKET_README.md` when marketplace-facing documentation changes.
+5. Add a new plugin name to `catalog/marketplace.json.plugins` in desired display order.
+6. Bump that plugin's strict-semver descriptor `version` whenever its shipped payload, generated
    manifest metadata, marketplace policy, or category changes.
-6. Keep origin/provenance metadata accurate when importing content from another repository.
-7. Run `npm run verify` and inspect both target bundles in `dist/`.
-8. Optionally run `npm run sync:local` for a local install smoke test.
+7. Keep origin/provenance metadata accurate when importing content from another repository.
+8. Run `npm run verify` and inspect both target bundles plus `dist/docs/`.
+9. Optionally run `npm run sync:local` for a local install smoke test.
 
 A rename is a removal plus an addition. Plugin removal is blocked by the release gate; implement an
 explicit, reviewed removal mechanism before intentionally withdrawing a plugin.
@@ -89,6 +98,8 @@ GitHub Actions rejects a mismatch or a tag created from another branch.
 The release gate compares the currently published and candidate Claude/Codex bundles plus their
 marketplace entries. Changed payload with an unchanged or lower plugin version fails. SemVer
 parsing and precedence use the npm `semver` package; build metadata alone is not an upgrade.
+Marketplace documents under `docs/` and `MARKET_README.md` are not installed plugin payload and
+therefore do not require a plugin version bump.
 
 Normal release preparation:
 

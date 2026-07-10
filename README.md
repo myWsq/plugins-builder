@@ -21,6 +21,8 @@ npm run sync:local
 
 ```text
 catalog/                  Marketplace and plugin metadata
+docs/                     Free-form marketplace documentation
+MARKET_README.md           Source for the generated marketplace README
 plugins/<name>/skills/    Canonical skill source
 src/                      Build and local-sync tooling
 test/                     Determinism and safety tests
@@ -29,6 +31,8 @@ dist/                     Generated marketplace tree
 
 The compiler emits separate Claude and Codex plugin bundles from the same canonical source so
 platform-specific MCP, app, hook, and authentication configuration can evolve independently.
+`MARKET_README.md` and `docs/` are copied verbatim to the generated marketplace root. They are not
+duplicated inside installable plugin bundles.
 
 ## Publishing
 

@@ -72,6 +72,22 @@ test("build emits deterministic Claude and Codex marketplaces", async (t) => {
     sourceSkills
   );
   assert.deepEqual(await snapshotTree(join(first, "plugins", "dev", "skills")), sourceSkills);
+  assert.deepEqual(
+    await snapshotTree(join(first, "docs")),
+    await snapshotTree(join(defaultProjectRoot, "docs"))
+  );
+  const canonicalDocs = await readFile(join(defaultProjectRoot, "docs", "dev.md"), "utf8");
+  assert.equal(await readFile(join(first, "docs", "dev.md"), "utf8"), canonicalDocs);
+  assert.equal(
+    await readFile(join(first, "README.md"), "utf8"),
+    await readFile(join(defaultProjectRoot, "MARKET_README.md"), "utf8")
+  );
+  await assert.rejects(readFile(join(first, "claude-plugins", "dev", "README.md")), {
+    code: "ENOENT"
+  });
+  await assert.rejects(readFile(join(first, "plugins", "dev", "README.md")), {
+    code: "ENOENT"
+  });
   assert.equal(
     JSON.parse(
       await readFile(join(first, "plugins", "dev", ".codex-plugin", "plugin.json"), "utf8")
@@ -205,4 +221,16 @@ test("release gate treats marketplace policy as versioned plugin payload", async
     checkRelease({ currentDir, nextDir }),
     /payload changed without a version bump/
   );
+});
+
+test("marketplace documentation is outside the plugin version contract", async (t) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-docs-"));
+  t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const currentDir = join(temporaryRoot, "current");
+  const nextDir = join(temporaryRoot, "next");
+  await build({ outDir: currentDir, sourceRevision: "current" });
+  await build({ outDir: nextDir, sourceRevision: "next" });
+  await writeFile(join(nextDir, "docs", "dev.md"), "docs-only change\n");
+
+  await checkRelease({ currentDir, nextDir });
 });

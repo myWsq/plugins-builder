@@ -139,38 +139,6 @@ function codexPluginManifest(plugin) {
   };
 }
 
-function generatedReadme(catalog, plugins) {
-  const pluginList = plugins
-    .map((plugin) => `- \`${plugin.name}\` \`v${plugin.version}\` — ${plugin.description}`)
-    .join("\n");
-
-  return `# ${catalog.name}
-
-${catalog.description}
-
-## Plugins
-
-${pluginList}
-
-## Claude Code
-
-\`\`\`text
-/plugin marketplace add myWsq/${catalog.name}
-/plugin install <plugin-name>@${catalog.name}
-\`\`\`
-
-## Codex
-
-\`\`\`bash
-codex plugin marketplace add myWsq/${catalog.name}
-codex plugin add <plugin-name>@${catalog.name}
-\`\`\`
-
-This repository is generated from [myWsq/plugins-builder](https://github.com/myWsq/plugins-builder).
-Do not edit generated files by hand.
-`;
-}
-
 function parseArgs(argv) {
   const options = {};
   for (let index = 0; index < argv.length; index += 1) {
@@ -211,6 +179,11 @@ export async function build({
   invariant(new Set(catalog.plugins).size === catalog.plugins.length, "catalog.plugins contains duplicate names");
 
   const packageJson = await readJson(join(projectRoot, "package.json"));
+  const docsRoot = join(projectRoot, "docs");
+  const marketReadme = join(projectRoot, "MARKET_README.md");
+  invariant(await pathExists(docsRoot), "Marketplace documentation directory docs/ is required");
+  invariant(await pathExists(marketReadme), "MARKET_README.md is required");
+  await assertPortableTree(docsRoot);
   const plugins = [];
   for (const name of catalog.plugins) {
     invariant(typeof name === "string" && NAME_PATTERN.test(name), `Invalid catalog plugin name: ${name}`);
@@ -280,8 +253,9 @@ export async function build({
       },
       plugins: codexEntries
     });
+    await cp(docsRoot, join(temporaryRoot, "docs"), { recursive: true });
     await cp(join(projectRoot, "LICENSE"), join(temporaryRoot, "LICENSE"));
-    await writeFile(join(temporaryRoot, "README.md"), generatedReadme(catalog, plugins), "utf8");
+    await cp(marketReadme, join(temporaryRoot, "README.md"));
     await writeJson(join(temporaryRoot, "BUILD_INFO.json"), {
       schemaVersion: 1,
       builderVersion: packageJson.version,
