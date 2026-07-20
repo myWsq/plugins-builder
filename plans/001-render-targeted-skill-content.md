@@ -69,14 +69,14 @@ Out of scope:
 
 ## Done criteria
 
-- [ ] All listed commands pass.
-- [ ] Shared Markdown appears in both target bundles and each target receives only its matching block content.
-- [ ] Generated Markdown contains no consumed directive markers.
-- [ ] Malformed known directives fail with an actionable source-path error.
-- [ ] Files without directives and non-Markdown skill files remain byte-identical.
-- [ ] Documentation explains the source syntax and plugin-version consequence of using it.
-- [ ] No out-of-scope files changed.
-- [ ] `plans/README.md` status is updated.
+- [x] All listed commands pass.
+- [x] Shared Markdown appears in both target bundles and each target receives only its matching block content.
+- [x] Generated Markdown contains no consumed directive markers.
+- [x] Malformed known directives fail with an actionable source-path error.
+- [x] Files without directives and non-Markdown skill files remain byte-identical.
+- [x] Documentation explains the source syntax and plugin-version consequence of using it.
+- [x] No out-of-scope files changed.
+- [x] `plans/README.md` status is updated.
 
 ## STOP conditions
 
