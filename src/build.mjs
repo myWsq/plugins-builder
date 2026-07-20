@@ -11,6 +11,9 @@ const COMMAND_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 const PORTABLE_PATH_SEGMENT_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 const CODEX_INSTALLATION = new Set(["NOT_AVAILABLE", "AVAILABLE", "INSTALLED_BY_DEFAULT"]);
 const CODEX_AUTHENTICATION = new Set(["ON_INSTALL", "ON_USE"]);
+const SKILL_TARGETS = new Set(["claude", "codex"]);
+const TARGET_DIRECTIVE_PATTERN = /^[\t ]*<!--[\t ]*(\/)?(claude|codex)[\t ]*-->[\t ]*$/;
+const KNOWN_TARGET_DIRECTIVE_PATTERN = /<!--[\t ]*\/?(?:claude|codex)[\t ]*-->/;
 
 function invariant(condition, message) {
   if (!condition) {
@@ -142,6 +145,78 @@ export async function assertPortableTree(root) {
   }
 
   await visit(root);
+}
+
+export function renderTargetMarkdown(text, target, sourcePath = "Markdown source") {
+  invariant(SKILL_TARGETS.has(target), `Unsupported skill target: ${target}`);
+  let activeTarget;
+  let foundDirective = false;
+  const output = [];
+
+  for (const line of text.split(/(?<=\n)/)) {
+    const content = line.endsWith("\n")
+      ? line.slice(0, line.endsWith("\r\n") ? -2 : -1)
+      : line;
+    const directive = content.match(TARGET_DIRECTIVE_PATTERN);
+
+    if (!directive) {
+      invariant(
+        !KNOWN_TARGET_DIRECTIVE_PATTERN.test(content),
+        `Invalid target directive in ${sourcePath}: directives must occupy their own line`
+      );
+      if (activeTarget === undefined || activeTarget === target) output.push(line);
+      continue;
+    }
+
+    foundDirective = true;
+    const closing = directive[1] === "/";
+    const directiveTarget = directive[2];
+    if (closing) {
+      invariant(
+        activeTarget !== undefined,
+        `Invalid target directive in ${sourcePath}: closing ${directiveTarget} without an open block`
+      );
+      invariant(
+        activeTarget === directiveTarget,
+        `Invalid target directive in ${sourcePath}: closing ${directiveTarget} while ${activeTarget} is open`
+      );
+      activeTarget = undefined;
+    } else {
+      invariant(
+        activeTarget === undefined,
+        `Invalid target directive in ${sourcePath}: nested ${directiveTarget} block inside ${activeTarget}`
+      );
+      activeTarget = directiveTarget;
+    }
+  }
+
+  invariant(
+    activeTarget === undefined,
+    `Invalid target directive in ${sourcePath}: unclosed ${activeTarget} block`
+  );
+  return foundDirective ? output.join("") : text;
+}
+
+async function copySkillTree(sourceRoot, destinationRoot, target) {
+  await cp(sourceRoot, destinationRoot, { recursive: true });
+
+  async function visit(directory) {
+    const entries = await readdir(directory, { withFileTypes: true });
+    entries.sort((left, right) => left.name.localeCompare(right.name));
+    for (const entry of entries) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        await visit(path);
+      } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".md")) {
+        const text = await readFile(path, "utf8");
+        const sourcePath = join(sourceRoot, relative(destinationRoot, path));
+        const rendered = renderTargetMarkdown(text, target, sourcePath);
+        if (rendered !== text) await writeFile(path, rendered, "utf8");
+      }
+    }
+  }
+
+  await visit(destinationRoot);
 }
 
 function claudePluginManifest(plugin) {
@@ -290,8 +365,8 @@ export async function build({
 
       await mkdir(join(claudeRoot, ".claude-plugin"), { recursive: true });
       await mkdir(join(codexRoot, ".codex-plugin"), { recursive: true });
-      await cp(join(sourceRoot, "skills"), join(claudeRoot, "skills"), { recursive: true });
-      await cp(join(sourceRoot, "skills"), join(codexRoot, "skills"), { recursive: true });
+      await copySkillTree(join(sourceRoot, "skills"), join(claudeRoot, "skills"), "claude");
+      await copySkillTree(join(sourceRoot, "skills"), join(codexRoot, "skills"), "codex");
       if (plugin.mcpServers) {
         await cp(join(sourceRoot, "mcp"), join(claudeRoot, "mcp"), { recursive: true });
         await cp(join(sourceRoot, "mcp"), join(codexRoot, "mcp"), { recursive: true });

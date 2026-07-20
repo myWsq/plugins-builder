@@ -9,6 +9,7 @@ import {
   assertPortableTree,
   build,
   defaultProjectRoot,
+  renderTargetMarkdown,
   validatePluginDescriptor
 } from "../src/build.mjs";
 import { checkRelease } from "../src/check-release.mjs";
@@ -45,6 +46,18 @@ async function updateJson(path, update) {
   const value = JSON.parse(await readFile(path, "utf8"));
   update(value);
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+async function copyProjectFixture(temporaryRoot) {
+  const projectRoot = join(temporaryRoot, "project");
+  await mkdir(projectRoot, { recursive: true });
+  for (const directory of ["catalog", "docs", "plugins"]) {
+    await cp(join(defaultProjectRoot, directory), join(projectRoot, directory), { recursive: true });
+  }
+  for (const file of ["LICENSE", "MARKET_README.md", "package.json"]) {
+    await cp(join(defaultProjectRoot, file), join(projectRoot, file));
+  }
+  return projectRoot;
 }
 
 test("build emits deterministic Claude and Codex marketplaces", async (t) => {
@@ -123,6 +136,77 @@ test("build emits deterministic Claude and Codex marketplaces", async (t) => {
   );
   assert.equal(codexManifest.skills, "./skills/");
   assert.equal(codexManifest.mcpServers, "./.mcp.json");
+});
+
+test("build renders target blocks in skill Markdown without renaming source files", async (t) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-target-skill-"));
+  t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const projectRoot = await copyProjectFixture(temporaryRoot);
+  const skillRoot = join(projectRoot, "plugins", "dev", "skills", "dev-explore");
+  const source = [
+    "# Shared\n",
+    "<!-- codex -->\n",
+    "Codex only.\n",
+    "<!-- /codex -->\n",
+    "<!-- claude -->\n",
+    "Claude only.\n",
+    "<!-- /claude -->\n"
+  ].join("");
+  await writeFile(join(skillRoot, "SKILL.md"), source);
+  await mkdir(join(skillRoot, "references"), { recursive: true });
+  await writeFile(
+    join(skillRoot, "references", "platform.md"),
+    "Shared reference.\n<!-- codex -->\nCodex reference.\n<!-- /codex -->\n"
+  );
+  await writeFile(join(skillRoot, "directive.txt"), source);
+
+  const outDir = join(temporaryRoot, "dist");
+  await build({ projectRoot, outDir, sourceRevision: "test-revision" });
+
+  const claudeSkillRoot = join(outDir, "claude-plugins", "dev", "skills", "dev-explore");
+  const codexSkillRoot = join(outDir, "plugins", "dev", "skills", "dev-explore");
+  assert.equal(await readFile(join(claudeSkillRoot, "SKILL.md"), "utf8"), "# Shared\nClaude only.\n");
+  assert.equal(await readFile(join(codexSkillRoot, "SKILL.md"), "utf8"), "# Shared\nCodex only.\n");
+  assert.equal(
+    await readFile(join(claudeSkillRoot, "references", "platform.md"), "utf8"),
+    "Shared reference.\n"
+  );
+  assert.equal(
+    await readFile(join(codexSkillRoot, "references", "platform.md"), "utf8"),
+    "Shared reference.\nCodex reference.\n"
+  );
+  assert.equal(await readFile(join(claudeSkillRoot, "directive.txt"), "utf8"), source);
+  assert.equal(await readFile(join(codexSkillRoot, "directive.txt"), "utf8"), source);
+});
+
+test("target block rendering rejects malformed known directives", () => {
+  const sourcePath = "plugins/example/skills/example/SKILL.md";
+  const invalidSources = [
+    ["orphan close", "<!-- /codex -->\n", /closing codex without an open block/],
+    [
+      "mismatched close",
+      "<!-- codex -->\ntext\n<!-- /claude -->\n",
+      /closing claude while codex is open/
+    ],
+    [
+      "nested block",
+      "<!-- codex -->\n<!-- claude -->\n<!-- /claude -->\n<!-- /codex -->\n",
+      /nested claude block inside codex/
+    ],
+    ["unclosed block", "<!-- claude -->\ntext\n", /unclosed claude block/],
+    ["inline marker", "text <!-- codex -->\n", /directives must occupy their own line/]
+  ];
+
+  for (const [name, source, message] of invalidSources) {
+    assert.throws(
+      () => renderTargetMarkdown(source, "codex", sourcePath),
+      (error) => {
+        assert.match(error.message, message, name);
+        assert.match(error.message, new RegExp(sourcePath.replaceAll("/", "\\/")), name);
+        return true;
+      }
+    );
+  }
 });
 
 test("build removes stale generated files", async (t) => {
@@ -235,14 +319,7 @@ test("descriptor validation rejects unsafe MCP names and entries", async () => {
 test("build rejects a missing MCP source entry", async (t) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-mcp-source-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
-  const projectRoot = join(temporaryRoot, "project");
-  await mkdir(projectRoot, { recursive: true });
-  await cp(join(defaultProjectRoot, "catalog"), join(projectRoot, "catalog"), { recursive: true });
-  await cp(join(defaultProjectRoot, "docs"), join(projectRoot, "docs"), { recursive: true });
-  await cp(join(defaultProjectRoot, "plugins"), join(projectRoot, "plugins"), { recursive: true });
-  for (const file of ["LICENSE", "MARKET_README.md", "package.json"]) {
-    await cp(join(defaultProjectRoot, file), join(projectRoot, file));
-  }
+  const projectRoot = await copyProjectFixture(temporaryRoot);
   await rm(join(projectRoot, "plugins", "dev", "mcp", "server.mjs"), { force: true });
 
   await assert.rejects(
