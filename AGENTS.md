@@ -56,6 +56,13 @@ build errors. Do not introduce a general template language or target-specific so
 this use case. Adding or changing rendered content changes shipped payload, so bump the plugin
 version.
 
+Reusable skill Markdown belongs in flat, kebab-case `plugins/<name>/fragments/<fragment>.md` files.
+Reference one on its own line with `<!-- include <fragment> -->`. The compiler filters target blocks
+before expanding retained includes, and fragments are source-only rather than shipped as separate
+files. A fragment must end with a newline and cannot contain target or include directives. Missing,
+inline, nested, or malformed includes are build errors. Keep fragments small and literal; do not
+turn this mechanism into recursive templating.
+
 `mcpServers` is target-neutral catalog data. Each server has a kebab-case name, a safe executable
 name in `command`, and a portable `entry` path beneath `mcp/`. The entry must resolve to a real file
 in the canonical plugin source. The compiler copies the complete `mcp/` tree, renders Claude's

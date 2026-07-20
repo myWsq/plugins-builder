@@ -9,6 +9,10 @@ Write one plan for one requirement. The plan is an **outcome contract, not a ste
 
 A requirement that genuinely decomposes may become a small **plan group** whose members can execute concurrently (see step 2); each member is still a self-contained outcome contract.
 
+<!-- codex -->
+<!-- include codex-request-user-input -->
+<!-- /codex -->
+
 ## Rules
 
 1. Do not edit source code. Only create or update files under `plans/`.

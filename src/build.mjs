@@ -14,6 +14,9 @@ const CODEX_AUTHENTICATION = new Set(["ON_INSTALL", "ON_USE"]);
 const SKILL_TARGETS = new Set(["claude", "codex"]);
 const TARGET_DIRECTIVE_PATTERN = /^[\t ]*<!--[\t ]*(\/)?(claude|codex)[\t ]*-->[\t ]*$/;
 const KNOWN_TARGET_DIRECTIVE_PATTERN = /<!--[\t ]*\/?(?:claude|codex)[\t ]*-->/;
+const FRAGMENT_FILE_PATTERN = /^([a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
+const INCLUDE_DIRECTIVE_PATTERN = /^[\t ]*<!--[\t ]*include[\t ]+([a-z0-9]+(?:-[a-z0-9]+)*)[\t ]*-->[\t ]*$/;
+const KNOWN_INCLUDE_DIRECTIVE_PATTERN = /<!--[\t ]*include\b.*-->/;
 
 function invariant(condition, message) {
   if (!condition) {
@@ -197,7 +200,57 @@ export function renderTargetMarkdown(text, target, sourcePath = "Markdown source
   return foundDirective ? output.join("") : text;
 }
 
-async function copySkillTree(sourceRoot, destinationRoot, target) {
+export function expandSkillFragments(text, fragments, sourcePath = "Markdown source") {
+  const output = [];
+  for (const line of text.split(/(?<=\n)/)) {
+    const content = line.endsWith("\n")
+      ? line.slice(0, line.endsWith("\r\n") ? -2 : -1)
+      : line;
+    const directive = content.match(INCLUDE_DIRECTIVE_PATTERN);
+    if (!directive) {
+      invariant(
+        !KNOWN_INCLUDE_DIRECTIVE_PATTERN.test(content),
+        `Invalid fragment include in ${sourcePath}: includes must occupy their own line and use a kebab-case name`
+      );
+      output.push(line);
+      continue;
+    }
+
+    const name = directive[1];
+    invariant(fragments.has(name), `Unknown skill fragment ${name} referenced by ${sourcePath}`);
+    output.push(fragments.get(name));
+  }
+  return output.join("");
+}
+
+async function loadSkillFragments(sourceRoot) {
+  const fragmentsRoot = join(sourceRoot, "fragments");
+  if (!(await pathExists(fragmentsRoot))) return new Map();
+  const fragmentsStat = await lstat(fragmentsRoot);
+  invariant(fragmentsStat.isDirectory(), `Skill fragments path must be a directory: ${fragmentsRoot}`);
+  const fragments = new Map();
+  const entries = await readdir(fragmentsRoot, { withFileTypes: true });
+  entries.sort((left, right) => left.name.localeCompare(right.name));
+
+  for (const entry of entries) {
+    const match = entry.name.match(FRAGMENT_FILE_PATTERN);
+    invariant(
+      entry.isFile() && match,
+      `Skill fragments must be flat kebab-case Markdown files: ${join(fragmentsRoot, entry.name)}`
+    );
+    const path = join(fragmentsRoot, entry.name);
+    const text = await readFile(path, "utf8");
+    invariant(text.endsWith("\n"), `Skill fragment must end with a newline: ${path}`);
+    invariant(
+      !KNOWN_TARGET_DIRECTIVE_PATTERN.test(text) && !KNOWN_INCLUDE_DIRECTIVE_PATTERN.test(text),
+      `Skill fragment must not contain target or include directives: ${path}`
+    );
+    fragments.set(match[1], text);
+  }
+  return fragments;
+}
+
+async function copySkillTree(sourceRoot, destinationRoot, target, fragments) {
   await cp(sourceRoot, destinationRoot, { recursive: true });
 
   async function visit(directory) {
@@ -210,7 +263,8 @@ async function copySkillTree(sourceRoot, destinationRoot, target) {
       } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".md")) {
         const text = await readFile(path, "utf8");
         const sourcePath = join(sourceRoot, relative(destinationRoot, path));
-        const rendered = renderTargetMarkdown(text, target, sourcePath);
+        const targeted = renderTargetMarkdown(text, target, sourcePath);
+        const rendered = expandSkillFragments(targeted, fragments, sourcePath);
         if (rendered !== text) await writeFile(path, rendered, "utf8");
       }
     }
@@ -362,11 +416,22 @@ export async function build({
       const sourceRoot = join(projectRoot, "plugins", plugin.name);
       const claudeRoot = join(temporaryRoot, "claude-plugins", plugin.name);
       const codexRoot = join(temporaryRoot, "plugins", plugin.name);
+      const skillFragments = await loadSkillFragments(sourceRoot);
 
       await mkdir(join(claudeRoot, ".claude-plugin"), { recursive: true });
       await mkdir(join(codexRoot, ".codex-plugin"), { recursive: true });
-      await copySkillTree(join(sourceRoot, "skills"), join(claudeRoot, "skills"), "claude");
-      await copySkillTree(join(sourceRoot, "skills"), join(codexRoot, "skills"), "codex");
+      await copySkillTree(
+        join(sourceRoot, "skills"),
+        join(claudeRoot, "skills"),
+        "claude",
+        skillFragments
+      );
+      await copySkillTree(
+        join(sourceRoot, "skills"),
+        join(codexRoot, "skills"),
+        "codex",
+        skillFragments
+      );
       if (plugin.mcpServers) {
         await cp(join(sourceRoot, "mcp"), join(claudeRoot, "mcp"), { recursive: true });
         await cp(join(sourceRoot, "mcp"), join(codexRoot, "mcp"), { recursive: true });

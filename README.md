@@ -62,6 +62,17 @@ directives. Non-Markdown files and Markdown without directives are copied byte-f
 changing a target block changes installed plugin payload and therefore requires a plugin version
 bump.
 
+Reusable Markdown lives in flat, kebab-case files under `plugins/<name>/fragments/` and is inserted
+with an include on its own line:
+
+```markdown
+<!-- include codex-request-user-input -->
+```
+
+The compiler selects the target blocks first and then expands includes that remain. Fragment files
+are source-only and are not copied into either plugin bundle. They must end with a newline and may
+not contain target blocks or other includes; missing, inline, or nested references fail the build.
+
 ## Publishing
 
 Pull requests and `main` pushes run verification only. A `vX.Y.Z` tag runs the release workflow:

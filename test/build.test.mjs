@@ -9,6 +9,7 @@ import {
   assertPortableTree,
   build,
   defaultProjectRoot,
+  expandSkillFragments,
   renderTargetMarkdown,
   validatePluginDescriptor
 } from "../src/build.mjs";
@@ -60,6 +61,27 @@ async function copyProjectFixture(temporaryRoot) {
   return projectRoot;
 }
 
+async function assertRenderedSkillTree(sourceRoot, generatedRoot, target, fragments = new Map()) {
+  const sourceTree = await snapshotTree(sourceRoot);
+  const generatedTree = await snapshotTree(generatedRoot);
+  assert.deepEqual(Object.keys(generatedTree), Object.keys(sourceTree));
+
+  for (const [path, sourceMetadata] of Object.entries(sourceTree)) {
+    assert.equal(generatedTree[path].mode, sourceMetadata.mode, `${target} mode for ${path}`);
+    if (path.toLowerCase().endsWith(".md")) {
+      const source = await readFile(join(sourceRoot, path), "utf8");
+      const targeted = renderTargetMarkdown(source, target, join(sourceRoot, path));
+      assert.equal(
+        await readFile(join(generatedRoot, path), "utf8"),
+        expandSkillFragments(targeted, fragments, join(sourceRoot, path)),
+        `${target} content for ${path}`
+      );
+    } else {
+      assert.equal(generatedTree[path].hash, sourceMetadata.hash, `${target} hash for ${path}`);
+    }
+  }
+}
+
 test("build emits deterministic Claude and Codex marketplaces", async (t) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-test-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
@@ -77,15 +99,54 @@ test("build emits deterministic Claude and Codex marketplaces", async (t) => {
     await readFile(join(first, ".agents", "plugins", "marketplace.json"), "utf8")
   );
   assert.equal(claudeMarketplace.plugins[0].source, "./claude-plugins/dev");
-  assert.equal(claudeMarketplace.plugins[0].version, "0.2.1");
+  assert.equal(claudeMarketplace.plugins[0].version, "0.2.2");
   assert.equal(codexMarketplace.plugins[0].source.path, "./plugins/dev");
 
-  const sourceSkills = await snapshotTree(join(defaultProjectRoot, "plugins", "dev", "skills"));
-  assert.deepEqual(
-    await snapshotTree(join(first, "claude-plugins", "dev", "skills")),
-    sourceSkills
+  const sourceSkills = join(defaultProjectRoot, "plugins", "dev", "skills");
+  const fragments = new Map([
+    [
+      "codex-request-user-input",
+      await readFile(
+        join(defaultProjectRoot, "plugins", "dev", "fragments", "codex-request-user-input.md"),
+        "utf8"
+      )
+    ]
+  ]);
+  await assertRenderedSkillTree(
+    sourceSkills,
+    join(first, "claude-plugins", "dev", "skills"),
+    "claude",
+    fragments
   );
-  assert.deepEqual(await snapshotTree(join(first, "plugins", "dev", "skills")), sourceSkills);
+  await assertRenderedSkillTree(
+    sourceSkills,
+    join(first, "plugins", "dev", "skills"),
+    "codex",
+    fragments
+  );
+
+  for (const skill of ["dev-explore", "dev-write-plan", "dev-execute-plan"]) {
+    const sourceSkill = await readFile(join(sourceSkills, skill, "SKILL.md"), "utf8");
+    const claudeSkill = await readFile(
+      join(first, "claude-plugins", "dev", "skills", skill, "SKILL.md"),
+      "utf8"
+    );
+    const codexSkill = await readFile(
+      join(first, "plugins", "dev", "skills", skill, "SKILL.md"),
+      "utf8"
+    );
+    assert.match(sourceSkill, /<!-- include codex-request-user-input -->/);
+    assert.doesNotMatch(sourceSkill, /default_mode_request_user_input/);
+    assert.doesNotMatch(claudeSkill, /default_mode_request_user_input/);
+    assert.match(codexSkill, /request_user_input/);
+    assert.match(codexSkill, /codex features enable default_mode_request_user_input/);
+    assert.doesNotMatch(claudeSkill, /<!-- \/?(?:codex|claude) -->/);
+    assert.doesNotMatch(codexSkill, /<!-- \/?(?:codex|claude) -->/);
+    assert.doesNotMatch(codexSkill, /<!-- include /);
+  }
+  await assert.rejects(lstat(join(first, "claude-plugins", "dev", "fragments")), { code: "ENOENT" });
+  await assert.rejects(lstat(join(first, "plugins", "dev", "fragments")), { code: "ENOENT" });
+
   const sourceMcp = await snapshotTree(join(defaultProjectRoot, "plugins", "dev", "mcp"));
   assert.deepEqual(await snapshotTree(join(first, "claude-plugins", "dev", "mcp")), sourceMcp);
   assert.deepEqual(await snapshotTree(join(first, "plugins", "dev", "mcp")), sourceMcp);
@@ -117,10 +178,9 @@ test("build emits deterministic Claude and Codex marketplaces", async (t) => {
   );
   const canonicalDocs = await readFile(join(defaultProjectRoot, "docs", "dev.md"), "utf8");
   assert.equal(await readFile(join(first, "docs", "dev.md"), "utf8"), canonicalDocs);
-  assert.equal(
-    await readFile(join(first, "README.md"), "utf8"),
-    await readFile(join(defaultProjectRoot, "MARKET_README.md"), "utf8")
-  );
+  const generatedReadme = await readFile(join(first, "README.md"), "utf8");
+  assert.equal(generatedReadme, await readFile(join(defaultProjectRoot, "MARKET_README.md"), "utf8"));
+  assert.match(generatedReadme, /codex features enable default_mode_request_user_input/);
   await assert.rejects(readFile(join(first, "claude-plugins", "dev", "README.md")), {
     code: "ENOENT"
   });
@@ -207,6 +267,37 @@ test("target block rendering rejects malformed known directives", () => {
       }
     );
   }
+});
+
+test("fragment includes expand once and reject invalid references", () => {
+  const fragments = new Map([["shared", "Shared fragment.\n"]]);
+  assert.equal(
+    expandSkillFragments("Before.\n<!-- include shared -->\nAfter.\n", fragments, "SKILL.md"),
+    "Before.\nShared fragment.\nAfter.\n"
+  );
+  assert.throws(
+    () => expandSkillFragments("<!-- include missing -->\n", fragments, "SKILL.md"),
+    /Unknown skill fragment missing referenced by SKILL\.md/
+  );
+  assert.throws(
+    () => expandSkillFragments("text <!-- include shared -->\n", fragments, "SKILL.md"),
+    /includes must occupy their own line and use a kebab-case name/
+  );
+});
+
+test("build rejects directives inside skill fragments", async (t) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-fragment-source-"));
+  t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const projectRoot = await copyProjectFixture(temporaryRoot);
+  await writeFile(
+    join(projectRoot, "plugins", "dev", "fragments", "codex-request-user-input.md"),
+    "<!-- include another-fragment -->\n"
+  );
+
+  await assert.rejects(
+    build({ projectRoot, outDir: join(temporaryRoot, "dist") }),
+    /Skill fragment must not contain target or include directives/
+  );
 });
 
 test("build removes stale generated files", async (t) => {
@@ -365,19 +456,19 @@ test("release gate requires a plugin version bump for payload changes", async (t
   await updateJson(
     join(nextDir, ".claude-plugin", "marketplace.json"),
     (marketplace) => {
-      marketplace.plugins[0].version = "0.2.2";
+      marketplace.plugins[0].version = "0.2.3";
     }
   );
   await updateJson(
     join(nextDir, "claude-plugins", "dev", ".claude-plugin", "plugin.json"),
     (manifest) => {
-      manifest.version = "0.2.2";
+      manifest.version = "0.2.3";
     }
   );
   await updateJson(
     join(nextDir, "plugins", "dev", ".codex-plugin", "plugin.json"),
     (manifest) => {
-      manifest.version = "0.2.2";
+      manifest.version = "0.2.3";
     }
   );
   await checkRelease({ currentDir, nextDir });
