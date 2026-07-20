@@ -47,6 +47,15 @@ catalog schema or required per-plugin layout. Adding apps, hooks, commands, agen
 components is compiler work: extend the neutral descriptor, render the platform-specific files,
 and add tests before expecting those files to appear in a release.
 
+Skill Markdown may select content for one generated target without changing its canonical filename.
+Use paired `<!-- codex -->`/`<!-- /codex -->` or `<!-- claude -->`/`<!-- /claude -->` markers on
+their own lines. Content outside target blocks is shared. The compiler renders every Markdown file
+beneath `skills/`, strips the markers and nonmatching blocks, and copies non-Markdown files
+verbatim. Target blocks cannot nest; orphaned, mismatched, inline, or unclosed known markers are
+build errors. Do not introduce a general template language or target-specific source copies for
+this use case. Adding or changing rendered content changes shipped payload, so bump the plugin
+version.
+
 `mcpServers` is target-neutral catalog data. Each server has a kebab-case name, a safe executable
 name in `command`, and a portable `entry` path beneath `mcp/`. The entry must resolve to a real file
 in the canonical plugin source. The compiler copies the complete `mcp/` tree, renders Claude's

@@ -39,6 +39,29 @@ configuration can evolve independently.
 `MARKET_README.md` and `docs/` are copied verbatim to the generated marketplace root. They are not
 duplicated inside installable plugin bundles.
 
+## Target-specific skill content
+
+Markdown files under `plugins/<name>/skills/` keep their normal filenames and may contain simple
+target blocks. Text outside a block is shared by both bundles:
+
+```markdown
+Shared instructions.
+
+<!-- codex -->
+Instructions emitted only in the Codex bundle.
+<!-- /codex -->
+
+<!-- claude -->
+Instructions emitted only in the Claude bundle.
+<!-- /claude -->
+```
+
+Directive markers must occupy their own lines and cannot be nested. The build removes the markers
+and the other target's block. It fails on orphaned, mismatched, nested, or unclosed known
+directives. Non-Markdown files and Markdown without directives are copied byte-for-byte. Adding or
+changing a target block changes installed plugin payload and therefore requires a plugin version
+bump.
+
 ## Publishing
 
 Pull requests and `main` pushes run verification only. A `vX.Y.Z` tag runs the release workflow:
