@@ -1,0 +1,45 @@
+{
+  "name": "commit",
+  "version": "0.1.0",
+  "displayName": "Commit",
+  "description": "Delegate git commit and push to a subagent on the host's cheapest model, keeping routine version-control work off the main session model.",
+  "shortDescription": "Delegate commit and push to a cheap subagent.",
+  "longDescription": "Commit provides a single skill that, when the user asks to commit or push, has the main model delegate the whole stage-and-commit flow to a subagent running on the host's cheapest available model. The main model only issues one delegation call and relays the result; the subagent stages related changes, checks for staged secrets, writes a Conventional Commits message that reflects the session's intent, and pushes only on explicit request.",
+  "author": {
+    "name": "Shuaiqi Wang",
+    "email": "wsq961@outlook.com",
+    "url": "https://github.com/myWsq"
+  },
+  "homepage": "https://github.com/myWsq/plugins",
+  "repository": "https://github.com/myWsq/plugins-builder",
+  "license": "MIT",
+  "keywords": [
+    "git",
+    "commit",
+    "skills",
+    "agent-delegation",
+    "conventional-commits"
+  ],
+  "capabilities": [
+    "Skills",
+    "Git",
+    "Agent Delegation"
+  ],
+  "defaultPrompt": [
+    "Commit my changes.",
+    "Commit and push my changes."
+  ],
+  "brandColor": "#059669",
+  "targets": {
+    "claude": {
+      "category": "development"
+    },
+    "codex": {
+      "category": "Developer Tools",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      }
+    }
+  }
+}

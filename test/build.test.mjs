@@ -198,6 +198,45 @@ test("build emits deterministic Claude and Codex marketplaces", async (t) => {
   assert.equal(codexManifest.mcpServers, "./.mcp.json");
 });
 
+test("build emits the commit plugin with target-rendered skill in both bundles", async (t) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-commit-"));
+  t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const outDir = join(temporaryRoot, "dist");
+  await build({ outDir, sourceRevision: "test-revision" });
+
+  const claudeMarketplace = JSON.parse(
+    await readFile(join(outDir, ".claude-plugin", "marketplace.json"), "utf8")
+  );
+  const codexMarketplace = JSON.parse(
+    await readFile(join(outDir, ".agents", "plugins", "marketplace.json"), "utf8")
+  );
+  assert.ok(claudeMarketplace.plugins.some((entry) => entry.name === "commit"));
+  assert.ok(codexMarketplace.plugins.some((entry) => entry.name === "commit"));
+
+  const claudeSkill = await readFile(
+    join(outDir, "claude-plugins", "commit", "skills", "commit", "SKILL.md"),
+    "utf8"
+  );
+  const codexSkill = await readFile(
+    join(outDir, "plugins", "commit", "skills", "commit", "SKILL.md"),
+    "utf8"
+  );
+  assert.match(claudeSkill, /haiku/);
+  assert.doesNotMatch(claudeSkill, /spawn_agent/);
+  assert.match(codexSkill, /spawn_agent/);
+  assert.doesNotMatch(codexSkill, /haiku/);
+  assert.doesNotMatch(claudeSkill, /<!-- \/?(?:codex|claude) -->/);
+  assert.doesNotMatch(codexSkill, /<!-- \/?(?:codex|claude) -->/);
+
+  const claudeManifest = JSON.parse(
+    await readFile(join(outDir, "claude-plugins", "commit", ".claude-plugin", "plugin.json"), "utf8")
+  );
+  assert.equal(claudeManifest.mcpServers, undefined);
+  await assert.rejects(lstat(join(outDir, "claude-plugins", "commit", ".mcp.json")), {
+    code: "ENOENT"
+  });
+});
+
 test("build renders target blocks in skill Markdown without renaming source files", async (t) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-target-skill-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
