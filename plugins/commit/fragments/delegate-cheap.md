@@ -1,0 +1,3 @@
+If the host exposes a subagent-spawning capability, you MUST delegate the entire flow to a subagent running on the host's cheapest available model. Do not run git or `gh` commands yourself. Only when the host has no such capability do you fall back to running the flow inline, following the exact same rules.
+
+The delegation prompt MUST include a one- or two-sentence summary of the intent behind this change — why it was made, drawn from the current session — and instruct the subagent to weave that intent into the commit message (and the PR description, when one is created). Without it the subagent has no session context and the output degrades into a diff paraphrase; the intent summary is the one thing that keeps a cheap-model result useful.

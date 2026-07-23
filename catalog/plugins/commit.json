@@ -2,9 +2,9 @@
   "name": "commit",
   "version": "0.1.0",
   "displayName": "Commit",
-  "description": "Delegate git commit and push to a subagent on the host's cheapest model, keeping routine version-control work off the main session model.",
-  "shortDescription": "Delegate commit and push to a cheap subagent.",
-  "longDescription": "Commit provides a single skill that, when the user asks to commit or push, has the main model delegate the whole stage-and-commit flow to a subagent running on the host's cheapest available model. The main model only issues one delegation call and relays the result; the subagent stages related changes, checks for staged secrets, writes a message in the repository's existing style following the host's standard commit conventions, and pushes only on explicit request.",
+  "description": "Delegate git commit, push, and pull-request workflows to a subagent on the host's cheapest model, keeping routine version-control work off the main session model.",
+  "shortDescription": "Delegate commit, push, and PR flows to a cheap subagent.",
+  "longDescription": "Commit mirrors the command surface of the official commit-commands plugin with three skills — commit, commit-push-pr, and clean-gone — each of which has the main model delegate the whole flow to a subagent running on the host's cheapest available model. The subagent stages related changes, checks for staged secrets, writes a message in the repository's existing style following the host's standard commit conventions, pushes and opens a PR only when the invoked flow asks for it, and clean-gone safely deletes only local branches whose upstream is gone.",
   "author": {
     "name": "Shuaiqi Wang",
     "email": "wsq961@outlook.com",
@@ -16,9 +16,9 @@
   "keywords": [
     "git",
     "commit",
+    "pull-request",
     "skills",
-    "agent-delegation",
-    "conventional-commits"
+    "agent-delegation"
   ],
   "capabilities": [
     "Skills",
@@ -27,7 +27,8 @@
   ],
   "defaultPrompt": [
     "Commit my changes.",
-    "Commit and push my changes."
+    "Commit, push, and open a PR.",
+    "Clean up branches whose remote is gone."
   ],
   "brandColor": "#059669",
   "targets": {
