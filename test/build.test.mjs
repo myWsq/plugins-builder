@@ -228,14 +228,14 @@ test("build emits the commit plugin with target-rendered skill in both bundles",
   assert.doesNotMatch(claudeSkill, /<!-- \/?(?:codex|claude) -->/);
   assert.doesNotMatch(codexSkill, /<!-- \/?(?:codex|claude) -->/);
 
-  for (const skill of ["commit", "commit-push-pr", "clean-gone"]) {
+  for (const skill of ["commit", "pr", "clean-gone"]) {
     for (const bundle of [join("claude-plugins", "commit"), join("plugins", "commit")]) {
       const rendered = await readFile(join(outDir, bundle, "skills", skill, "SKILL.md"), "utf8");
       assert.doesNotMatch(rendered, /<!--[\t ]*include\b/);
     }
   }
   const claudePushPr = await readFile(
-    join(outDir, "claude-plugins", "commit", "skills", "commit-push-pr", "SKILL.md"),
+    join(outDir, "claude-plugins", "commit", "skills", "pr", "SKILL.md"),
     "utf8"
   );
   assert.match(claudeSkill, /mirrors the host's standard commit workflow/);
