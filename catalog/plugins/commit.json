@@ -4,7 +4,7 @@
   "displayName": "Commit",
   "description": "Delegate git commit, push, and pull-request workflows to a subagent on the host's cheapest model, keeping routine version-control work off the main session model.",
   "shortDescription": "Delegate commit, push, and PR flows to a cheap subagent.",
-  "longDescription": "Commit mirrors the command surface of the official commit-commands plugin with three skills — commit, commit-pr, and commit-clean-gone — each of which has the main model delegate the whole flow to a subagent running on the host's cheapest available model. The subagent stages related changes, checks for staged secrets, writes a message in the repository's existing style following the host's standard commit conventions, pushes and opens a PR only when the invoked flow asks for it, and commit-clean-gone safely deletes only local branches whose upstream is gone.",
+  "longDescription": "Commit mirrors the command surface of the official commit-commands plugin with three skills — commit, commit-pr, and commit-clean — each of which has the main model delegate the whole flow to a subagent running on the host's cheapest available model. The subagent stages related changes, checks for staged secrets, writes a message in the repository's existing style following the host's standard commit conventions, pushes and opens a PR only when the invoked flow asks for it, and commit-clean safely deletes only local branches whose upstream is gone.",
   "author": {
     "name": "Shuaiqi Wang",
     "email": "wsq961@outlook.com",
