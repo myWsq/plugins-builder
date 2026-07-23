@@ -1,9 +1,9 @@
 ---
-name: clean-gone
+name: commit-clean-gone
 description: Delegate cleanup of local branches whose upstream is gone to a cheap subagent. Use when the user asks to clean up stale or gone branches and their worktrees (e.g. "clean up old branches", "清理分支", "clean gone"). Deletes only branches whose remote tracking branch is marked [gone]; the main model must not run git itself and delegates the whole cleanup to a subagent on the host's cheapest available model.
 ---
 
-# clean-gone
+# commit-clean-gone
 
 Deleting local branches whose remote is gone is purely mechanical and needs no session context. If the host exposes a subagent-spawning capability, you MUST delegate the cleanup to a subagent running on the host's cheapest available model instead of running git yourself; fall back to running it inline only when the host has no such capability.
 

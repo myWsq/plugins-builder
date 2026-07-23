@@ -1,9 +1,9 @@
 ---
-name: pr
+name: commit-pr
 description: Delegate the full commit → push → pull-request flow to a cheap subagent. Use when the user asks to open a PR, ship changes as a pull request, or says things like "open a PR", "commit and open a PR", "提交并开 PR". The main model must not run git or gh itself; it delegates the whole flow to a subagent running on the host's cheapest available model and relays the PR URL.
 ---
 
-# pr
+# commit-pr
 
 The full ship-it flow — branch, commit, push, open a pull request — is mechanical work that should not burn tokens on the session's main (most expensive) model. Invoking this command is the explicit request to push and open a PR.
 
