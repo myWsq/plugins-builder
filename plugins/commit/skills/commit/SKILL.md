@@ -22,11 +22,14 @@ Use experimental collab's `spawn_agent` to run the flow below on a cheaper model
 
 ## The commit flow (subagent, or inline fallback)
 
-1. Inspect `git status` and `git diff` to understand what changed.
-2. Stage only the changes related to this intent. Never `git add -A` unrelated files.
-3. Before committing, verify the staged content contains no secrets — `.env` files, private keys, credential files, tokens. If any are staged, stop and report instead of committing.
-4. Write a Conventional Commits message (`feat:`, `fix:`, `docs:`, …) whose body reflects the provided intent summary.
-5. Commit. Never use `git commit --no-verify`; let hooks run.
-6. Push only when the user explicitly asked to push — default to commit-only. Never use `git push --force`.
+This flow mirrors the host's standard commit workflow — the same rules the main agent would apply — so delegating changes who runs it, not how it behaves.
+
+1. Run `git status`, `git diff`, and `git log` in parallel: what changed, what is untracked, and the repository's existing commit message style.
+2. Stage only the files related to this intent, by name. Never `git add -A` or `git add .`.
+3. Before committing, verify the staged content contains no secrets — `.env` files, private keys, credential files, tokens. If any are staged, stop and report instead of committing. Never create an empty commit.
+4. Draft the message the way the host's main agent would: imperative mood, focused on **why** rather than what, matching the repository's existing style (use Conventional Commits only if the repo already does). Weave in the provided intent summary.
+5. Commit using the HEREDOC pattern, keeping the host's standard attribution trailers unless the user's attribution settings disable them. Never use `--no-verify` or `--no-gpg-sign`; never touch `git config`.
+6. If a pre-commit hook fails, retry once. If the hook modified files, amend only when the commit is your own and unpushed.
+7. Push only when the user explicitly asked to push — default to commit-only. Never `git push --force`, `reset --hard`, or amend pushed commits.
 
 Relay the result (commit message, hash, and whether it was pushed) back to the user.
