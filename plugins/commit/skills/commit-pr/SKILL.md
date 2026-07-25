@@ -1,33 +1,34 @@
 ---
 name: commit-pr
-description: Delegate the full commit → push → pull-request flow to a cheap subagent. Use when the user asks to open a PR, ship changes as a pull request, or says things like "open a PR", "commit and open a PR", "提交并开 PR". The main model must not run git or gh itself; it delegates the whole flow to a subagent running on the host's cheapest available model and relays the PR URL.
+description: Commit, push, and open a pull request without ever switching the working tree's branch. Use when the user asks to open a PR, ship changes as a pull request, or says things like "open a PR", "commit and open a PR", "提交并开 PR". On the default branch it publishes the commit as a new remote branch instead of checking one out.
 ---
 
 # commit-pr
 
-The full ship-it flow — branch, commit, push, open a pull request — is mechanical work that should not burn tokens on the session's main (most expensive) model. Invoking this command is the explicit request to push and open a PR.
+The full ship-it flow: commit, push, open a pull request. Invoking this command is the explicit request to push and open a PR.
 
-## Delegate, don't execute
+The commit never reaches the remote default branch, and the working tree's branch never changes — no `git switch`, no `git checkout`, no `git worktree add`. Commit on whatever branch is already checked out; publishing is what keeps the default branch clean.
 
-<!-- include delegate-cheap -->
-
-<!-- claude -->
-Use the Agent (Task) tool with `model` set to `haiku` (the cheapest Claude model) to run the flow below.
-<!-- /claude -->
-<!-- codex -->
-Use experimental collab's `spawn_agent` to run the flow below on a cheaper model of the same provider. Collab is beta and off by default, and can only switch models within the same provider. If collab is not enabled, fall back to running the flow inline yourself.
-<!-- /codex -->
-
-## The flow (subagent, or inline fallback)
-
-If currently on the default branch (`main`/`master`), create a descriptively named branch before committing — never commit directly to the default branch in this flow.
-
-Then commit:
+## 1. Commit
 
 <!-- include commit-flow -->
 
-Then publish:
+## 2. Publish
 
-1. Push the branch with `-u` to set the upstream. Never `git push --force`.
-2. Open the pull request with `gh pr create`, using a HEREDOC body containing a `## Summary` bullet list that reflects the intent summary and a `## Test plan` checklist.
-3. Relay the PR URL, the commit message, and the branch name back to the user.
+On a non-default branch:
+
+1. `git push -u origin HEAD` to set the upstream.
+2. Open the pull request with `gh pr create`, using a HEREDOC body containing a `## Summary` bullet list explaining why the change was made and a `## Test plan` checklist.
+
+On the default branch (`main`/`master`) the commit is now sitting on the local default branch, so publish it under another name instead:
+
+1. `git branch <name>`, with a descriptive kebab-case name drawn from the change. This only creates a ref — do not check it out.
+2. `git push origin <name>`. Never `-u` here: it would repoint the default branch's upstream at `<name>`.
+3. `gh pr create --head <name> --base <default>`, with the same HEREDOC body. `--head` is mandatory — `gh` otherwise infers the head from the checked-out branch, which is the default branch.
+4. Only if `git status --porcelain` is now empty, run `git reset --hard origin/<default>` so the local default branch matches its remote again. The commit is already safe on `<name>` and on the remote, so nothing is lost. If anything is still pending, skip the reset and report that the local default branch is one commit ahead.
+
+Never `git push --force`.
+
+## 3. Report
+
+The PR URL, the commit message, the branch name, and — when the flow started on the default branch — whether the local default branch was reset or left one commit ahead.

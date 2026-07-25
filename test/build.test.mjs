@@ -198,7 +198,7 @@ test("build emits deterministic Claude and Codex marketplaces", async (t) => {
   assert.equal(codexManifest.mcpServers, "./.mcp.json");
 });
 
-test("build emits the commit plugin with target-rendered skill in both bundles", async (t) => {
+test("build emits the commit plugin with fragment-expanded skills in both bundles", async (t) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-commit-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
   const outDir = join(temporaryRoot, "dist");
@@ -221,10 +221,7 @@ test("build emits the commit plugin with target-rendered skill in both bundles",
     join(outDir, "plugins", "commit", "skills", "commit", "SKILL.md"),
     "utf8"
   );
-  assert.match(claudeSkill, /haiku/);
-  assert.doesNotMatch(claudeSkill, /spawn_agent/);
-  assert.match(codexSkill, /spawn_agent/);
-  assert.doesNotMatch(codexSkill, /haiku/);
+  assert.equal(claudeSkill, codexSkill);
   assert.doesNotMatch(claudeSkill, /<!-- \/?(?:codex|claude) -->/);
   assert.doesNotMatch(codexSkill, /<!-- \/?(?:codex|claude) -->/);
 
@@ -240,8 +237,6 @@ test("build emits the commit plugin with target-rendered skill in both bundles",
   );
   assert.match(claudeSkill, /mirrors the host's standard commit workflow/);
   assert.match(claudePushPr, /mirrors the host's standard commit workflow/);
-  assert.match(claudePushPr, /haiku/);
-  assert.doesNotMatch(claudePushPr, /spawn_agent/);
   await assert.rejects(lstat(join(outDir, "claude-plugins", "commit", "fragments")), {
     code: "ENOENT"
   });
