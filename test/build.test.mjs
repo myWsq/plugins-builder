@@ -99,7 +99,10 @@ test("build emits deterministic Claude and Codex marketplaces", async (t) => {
     await readFile(join(first, ".agents", "plugins", "marketplace.json"), "utf8")
   );
   assert.equal(claudeMarketplace.plugins[0].source, "./claude-plugins/dev");
-  assert.equal(claudeMarketplace.plugins[0].version, "0.3.0");
+  const devDescriptor = JSON.parse(
+    await readFile(join(defaultProjectRoot, "catalog", "plugins", "dev.json"), "utf8")
+  );
+  assert.equal(claudeMarketplace.plugins[0].version, devDescriptor.version);
   assert.equal(codexMarketplace.plugins[0].source.path, "./plugins/dev");
 
   const sourceSkills = join(defaultProjectRoot, "plugins", "dev", "skills");
@@ -508,19 +511,19 @@ test("release gate requires a plugin version bump for payload changes", async (t
   await updateJson(
     join(nextDir, ".claude-plugin", "marketplace.json"),
     (marketplace) => {
-      marketplace.plugins[0].version = "0.3.1";
+      marketplace.plugins[0].version = "999.0.0";
     }
   );
   await updateJson(
     join(nextDir, "claude-plugins", "dev", ".claude-plugin", "plugin.json"),
     (manifest) => {
-      manifest.version = "0.3.1";
+      manifest.version = "999.0.0";
     }
   );
   await updateJson(
     join(nextDir, "plugins", "dev", ".codex-plugin", "plugin.json"),
     (manifest) => {
-      manifest.version = "0.3.1";
+      manifest.version = "999.0.0";
     }
   );
   await checkRelease({ currentDir, nextDir });
