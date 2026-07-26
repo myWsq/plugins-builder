@@ -6,4 +6,4 @@ Numbering continues from the legacy root `plans/` archive (001–002).
 | --- | --- | --- | --- |
 | [003](003-arch-plugin-monorepo-skill.md) | DONE | self | none |
 | [004](004-arch-web-skill.md) | DONE | self | 003 |
-| [005](005-arch-server-skill.md) | TODO | self | 004 |
+| [005](005-arch-server-skill.md) | DONE | self | 004 |
