@@ -1,0 +1,45 @@
+{
+  "name": "arch",
+  "version": "0.1.0",
+  "displayName": "Arch",
+  "description": "The owner's technology-selection knowledge base: decision frameworks with their reasons, one skill per domain.",
+  "shortDescription": "Technology-selection decision frameworks, one skill per domain.",
+  "longDescription": "Arch sediments the owner's technology-selection judgment as skills — decision frameworks that record how to choose and why, so an agent can apply the settled defaults or deviate for stated cause. The first skill, arch-monorepo, covers repository structure: default to one monorepo per context with pnpm + turborepo, a packages/ + apps/ layout, changesets fixed versioning, and the repository baseline (audience-split docs, wiki/ knowledge base, format/lint floor, and a neutral .agents/skills directory with .claude/skills symlinked to it). Further domains such as web and server land as sibling skills over time.",
+  "author": {
+    "name": "Shuaiqi Wang",
+    "email": "wsq961@outlook.com",
+    "url": "https://github.com/myWsq"
+  },
+  "homepage": "https://github.com/myWsq/plugins",
+  "repository": "https://github.com/myWsq/plugins-builder",
+  "license": "MIT",
+  "keywords": [
+    "architecture",
+    "technology-selection",
+    "monorepo",
+    "project-setup",
+    "skills"
+  ],
+  "capabilities": [
+    "Skills",
+    "Project Setup"
+  ],
+  "defaultPrompt": [
+    "Use arch-monorepo to set up this project with my baseline practices.",
+    "Use arch-monorepo to decide how to structure this repository.",
+    "Use arch-monorepo to align this repo with my conventions."
+  ],
+  "brandColor": "#7C3AED",
+  "targets": {
+    "claude": {
+      "category": "development"
+    },
+    "codex": {
+      "category": "Developer Tools",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      }
+    }
+  }
+}
