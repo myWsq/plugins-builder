@@ -195,6 +195,15 @@ Out of scope:
 - The release-gate test rejects the dev change for a reason other than the version
   bump handled here.
 
+## Execution notes
+
+- **Reported deviation**: `test/build.test.mjs` (out of scope) hardcoded the live
+  dev version twice — `"0.3.0"` as the expected marketplace version and `"0.3.1"`
+  as the release-gate bump fixture — so the 0.4.0 bump broke both. Fixed minimally,
+  preserving each test's semantics: the expectation now reads the version from
+  `catalog/plugins/dev.json`, and the fixture uses an always-greater `"999.0.0"`.
+  Any future plugin version bump would have hit the same wall.
+
 ## Maintenance notes
 
 - `arch` is the sedimentation point for future selection frameworks: one skill per
