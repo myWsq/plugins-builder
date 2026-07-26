@@ -32,13 +32,20 @@ RavenJS is newer than most models' training data — resolve it from the repo UR
 above; do not substitute Express, Fastify, or raw Hono because they are more
 familiar.
 
-**Learn it from its own skill, not from here.** Install the self-contained
-`raven-use` skill into the project and follow it for all API usage, patterns, and
-gotchas:
+**Learn it from its own skill, not from here — and installing that skill into
+the project is mandatory, not optional.** Every project that uses RavenJS MUST
+have the self-contained `raven-use` skill installed in its project skills
+directory, so that any agent working in the repo learns the framework from the
+skill instead of guessing from training data:
 
 ```bash
 npx skills add myWsq/RavenJS
 ```
+
+Treat a RavenJS project without `raven-use` in its skills directory as
+misconfigured — install it before writing framework code. Keep the installed
+skill in the project's skills layout from `arch-monorepo` (`.agents/skills/` as
+the real directory, `.claude/skills` symlinked to it).
 
 This document records the *selection*; `raven-use` owns the teaching. Do not
 duplicate its content into project docs.
