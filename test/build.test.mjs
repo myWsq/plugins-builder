@@ -253,6 +253,43 @@ test("build emits the commit plugin with fragment-expanded skills in both bundle
   });
 });
 
+test("build ships plugin hooks to the Claude bundle only", async (t) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-hooks-"));
+  t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const outDir = join(temporaryRoot, "dist");
+  await build({ outDir, sourceRevision: "test-revision" });
+
+  const sourceHooks = await snapshotTree(
+    join(defaultProjectRoot, "plugins", "subagent-model", "hooks")
+  );
+  assert.deepEqual(
+    await snapshotTree(join(outDir, "claude-plugins", "subagent-model", "hooks")),
+    sourceHooks
+  );
+  await assert.rejects(lstat(join(outDir, "plugins", "subagent-model", "hooks")), {
+    code: "ENOENT"
+  });
+});
+
+test("build rejects a plugin hooks directory without valid hooks.json", async (t) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-hooks-invalid-"));
+  t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const projectRoot = await copyProjectFixture(temporaryRoot);
+  const hooksJson = join(projectRoot, "plugins", "subagent-model", "hooks", "hooks.json");
+
+  await writeFile(hooksJson, "{ not json\n");
+  await assert.rejects(
+    build({ projectRoot, outDir: join(temporaryRoot, "dist") }),
+    /Invalid JSON in .*hooks\.json/
+  );
+
+  await rm(hooksJson, { force: true });
+  await assert.rejects(
+    build({ projectRoot, outDir: join(temporaryRoot, "dist") }),
+    /Unable to read .*hooks\.json/
+  );
+});
+
 test("build renders target blocks in skill Markdown without renaming source files", async (t) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-target-skill-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));

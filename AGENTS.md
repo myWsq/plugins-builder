@@ -42,10 +42,14 @@ content but preserves the target repository's `.git/`. Never point the build com
 a Git repository root.
 
 The current compiler ships `skills/` and descriptor-declared `mcp/` runtime files in both plugin
-targets, then copies `docs/` plus `MARKET_README.md` to the release root. Documentation has no
-catalog schema or required per-plugin layout. Adding apps, hooks, commands, agents, or other new
-components is compiler work: extend the neutral descriptor, render the platform-specific files,
-and add tests before expecting those files to appear in a release.
+targets, and ships an optional `hooks/` directory to the Claude bundle only — Codex has no hook
+mechanism. Hooks follow a directory convention instead of a descriptor field: `hooks/hooks.json`
+must exist and parse as JSON, and the tree is copied verbatim because it is already Claude's
+native format. The compiler then copies `docs/` plus `MARKET_README.md` to the release root.
+Documentation has no catalog schema or required per-plugin layout. Adding apps, commands, agents,
+or other new components is compiler work: extend the neutral descriptor when target files need
+rendering, use a directory convention when a native format ships verbatim, and add tests before
+expecting those files to appear in a release.
 
 Skill Markdown may select content for one generated target without changing its canonical filename.
 Use paired `<!-- codex -->`/`<!-- /codex -->` or `<!-- claude -->`/`<!-- /claude -->` markers on
@@ -82,6 +86,7 @@ dist/
 ├── claude-plugins/<name>/
 │   ├── .mcp.json
 │   ├── .claude-plugin/plugin.json
+│   ├── hooks/
 │   ├── mcp/
 │   └── skills/
 └── plugins/<name>/

@@ -384,6 +384,9 @@ export async function build({
     const sourceRoot = join(projectRoot, "plugins", name);
     await assertPortableTree(sourceRoot);
     invariant(await pathExists(join(sourceRoot, "skills")), `Plugin ${name} must contain skills/`);
+    if (await pathExists(join(sourceRoot, "hooks"))) {
+      await readJson(join(sourceRoot, "hooks", "hooks.json"));
+    }
     if (plugin.mcpServers) {
       const mcpRoot = join(sourceRoot, "mcp");
       invariant(await pathExists(mcpRoot), `Plugin ${name} declares MCP servers but has no mcp/`);
@@ -437,6 +440,9 @@ export async function build({
         await cp(join(sourceRoot, "mcp"), join(codexRoot, "mcp"), { recursive: true });
         await writeJson(join(claudeRoot, ".mcp.json"), mcpConfig(plugin, "claude"));
         await writeJson(join(codexRoot, ".mcp.json"), mcpConfig(plugin, "codex"));
+      }
+      if (await pathExists(join(sourceRoot, "hooks"))) {
+        await cp(join(sourceRoot, "hooks"), join(claudeRoot, "hooks"), { recursive: true });
       }
       await cp(join(projectRoot, "LICENSE"), join(claudeRoot, "LICENSE"));
       await cp(join(projectRoot, "LICENSE"), join(codexRoot, "LICENSE"));

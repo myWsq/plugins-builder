@@ -9,6 +9,7 @@
   "plugins": [
     "dev",
     "commit",
-    "arch"
+    "arch",
+    "subagent-model"
   ]
 }
