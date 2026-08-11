@@ -228,7 +228,7 @@ test("build emits the commit plugin with fragment-expanded skills in both bundle
   assert.doesNotMatch(claudeSkill, /<!-- \/?(?:codex|claude) -->/);
   assert.doesNotMatch(codexSkill, /<!-- \/?(?:codex|claude) -->/);
 
-  for (const skill of ["commit", "commit-pr", "commit-clean"]) {
+  for (const skill of ["commit", "commit-push", "commit-pr", "commit-clean"]) {
     for (const bundle of [join("claude-plugins", "commit"), join("plugins", "commit")]) {
       const rendered = await readFile(join(outDir, bundle, "skills", skill, "SKILL.md"), "utf8");
       assert.doesNotMatch(rendered, /<!--[\t ]*include\b/);
