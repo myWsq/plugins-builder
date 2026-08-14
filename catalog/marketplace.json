@@ -10,6 +10,7 @@
     "dev",
     "commit",
     "arch",
-    "subagent-model"
+    "subagent-model",
+    "coflux"
   ]
 }
