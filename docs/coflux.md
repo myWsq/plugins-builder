@@ -1,7 +1,7 @@
 # coflux
 
-`coflux` connects Claude Code to the owner's [coflux](https://github.com/myWsq)
-agent command center: a per-machine daemon runs the PTYs that host agent
+`coflux` connects Claude Code to the owner's coflux agent command center: a
+per-machine daemon runs the PTYs that host agent
 sessions, and a web client shows every workspace with its live turn state so a
 human can supervise many parallel agents and take over at any time.
 
