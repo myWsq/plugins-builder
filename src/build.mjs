@@ -360,6 +360,9 @@ export async function build({
       if (await pathExists(join(sourceRoot, "hooks"))) {
         await cp(join(sourceRoot, "hooks"), join(claudeRoot, "hooks"), { recursive: true });
       }
+      if (await pathExists(join(sourceRoot, "agents"))) {
+        await cp(join(sourceRoot, "agents"), join(claudeRoot, "agents"), { recursive: true });
+      }
       await cp(join(projectRoot, "LICENSE"), join(claudeRoot, "LICENSE"));
       await cp(join(projectRoot, "LICENSE"), join(codexRoot, "LICENSE"));
       await writeJson(join(claudeRoot, ".claude-plugin", "plugin.json"), claudePluginManifest(plugin));

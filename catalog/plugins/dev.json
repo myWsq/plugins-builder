@@ -1,6 +1,6 @@
 {
   "name": "dev",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "displayName": "Dev Skills",
   "description": "Plan-driven software development with subagent delegation: explore, plan, execute, and review.",
   "shortDescription": "Explore, plan, delegate, execute, and review software changes.",

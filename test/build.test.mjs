@@ -239,6 +239,22 @@ test("build ships plugin hooks to the Claude bundle only", async (t) => {
   });
 });
 
+test("build ships plugin agents to the Claude bundle only", async (t) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-agents-"));
+  t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const outDir = join(temporaryRoot, "dist");
+  await build({ outDir, sourceRevision: "test-revision" });
+
+  const sourceAgents = await snapshotTree(join(defaultProjectRoot, "plugins", "dev", "agents"));
+  assert.deepEqual(
+    await snapshotTree(join(outDir, "claude-plugins", "dev", "agents")),
+    sourceAgents
+  );
+  await assert.rejects(lstat(join(outDir, "plugins", "dev", "agents")), {
+    code: "ENOENT"
+  });
+});
+
 test("build rejects a plugin hooks directory without valid hooks.json", async (t) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-hooks-invalid-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
