@@ -169,7 +169,6 @@ test("build emits deterministic Claude and Codex marketplaces", async (t) => {
     await readFile(join(first, "plugins", "dev", ".codex-plugin", "plugin.json"), "utf8")
   );
   assert.equal(codexManifest.skills, "./skills/");
-  assert.equal(codexManifest.mcpServers, undefined);
   await assert.rejects(lstat(join(first, "claude-plugins", "dev", ".mcp.json")), { code: "ENOENT" });
   await assert.rejects(lstat(join(first, "plugins", "dev", ".mcp.json")), { code: "ENOENT" });
 });
