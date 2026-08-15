@@ -9,3 +9,4 @@ Numbering continues from the legacy root `plans/` archive (001–002).
 | [005](005-arch-server-skill.md) | DONE | self | 004 |
 | [006](006-commit-push-skill.md) | DONE | subagent | none |
 | [007](007-coflux-plugin.md) | DONE | self | none |
+| [008](008-remove-dev-agents-broker.md) | TODO | self | none |
