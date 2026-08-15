@@ -150,31 +150,6 @@ test("build emits deterministic Claude and Codex marketplaces", async (t) => {
   await assert.rejects(lstat(join(first, "claude-plugins", "dev", "fragments")), { code: "ENOENT" });
   await assert.rejects(lstat(join(first, "plugins", "dev", "fragments")), { code: "ENOENT" });
 
-  const sourceMcp = await snapshotTree(join(defaultProjectRoot, "plugins", "dev", "mcp"));
-  assert.deepEqual(await snapshotTree(join(first, "claude-plugins", "dev", "mcp")), sourceMcp);
-  assert.deepEqual(await snapshotTree(join(first, "plugins", "dev", "mcp")), sourceMcp);
-
-  const claudeMcp = JSON.parse(
-    await readFile(join(first, "claude-plugins", "dev", ".mcp.json"), "utf8")
-  );
-  assert.deepEqual(claudeMcp, {
-    "dev-agents": {
-      command: "node",
-      args: ["${CLAUDE_PLUGIN_ROOT}/mcp/server.mjs"]
-    }
-  });
-  const codexMcp = JSON.parse(
-    await readFile(join(first, "plugins", "dev", ".mcp.json"), "utf8")
-  );
-  assert.deepEqual(codexMcp, {
-    mcpServers: {
-      "dev-agents": {
-        command: "node",
-        args: ["./mcp/server.mjs"],
-        cwd: "."
-      }
-    }
-  });
   assert.deepEqual(
     await snapshotTree(join(first, "docs")),
     await snapshotTree(join(defaultProjectRoot, "docs"))
@@ -190,15 +165,13 @@ test("build emits deterministic Claude and Codex marketplaces", async (t) => {
   await assert.rejects(readFile(join(first, "plugins", "dev", "README.md")), {
     code: "ENOENT"
   });
-  const claudeManifest = JSON.parse(
-    await readFile(join(first, "claude-plugins", "dev", ".claude-plugin", "plugin.json"), "utf8")
-  );
-  assert.equal(claudeManifest.mcpServers, undefined);
   const codexManifest = JSON.parse(
     await readFile(join(first, "plugins", "dev", ".codex-plugin", "plugin.json"), "utf8")
   );
   assert.equal(codexManifest.skills, "./skills/");
-  assert.equal(codexManifest.mcpServers, "./.mcp.json");
+  assert.equal(codexManifest.mcpServers, undefined);
+  await assert.rejects(lstat(join(first, "claude-plugins", "dev", ".mcp.json")), { code: "ENOENT" });
+  await assert.rejects(lstat(join(first, "plugins", "dev", ".mcp.json")), { code: "ENOENT" });
 });
 
 test("build emits the commit plugin with fragment-expanded skills in both bundles", async (t) => {
@@ -244,10 +217,6 @@ test("build emits the commit plugin with fragment-expanded skills in both bundle
     code: "ENOENT"
   });
 
-  const claudeManifest = JSON.parse(
-    await readFile(join(outDir, "claude-plugins", "commit", ".claude-plugin", "plugin.json"), "utf8")
-  );
-  assert.equal(claudeManifest.mcpServers, undefined);
   await assert.rejects(lstat(join(outDir, "claude-plugins", "commit", ".mcp.json")), {
     code: "ENOENT"
   });
@@ -442,72 +411,6 @@ test("descriptor validation rejects invalid semver", () => {
         version: "1.0.0-01"
       }),
     /strict semver/
-  );
-});
-
-test("descriptor validation rejects unsafe MCP names and entries", async () => {
-  const descriptor = JSON.parse(
-    await readFile(join(defaultProjectRoot, "catalog", "plugins", "dev.json"), "utf8")
-  );
-  assert.throws(
-    () =>
-      validatePluginDescriptor({
-        ...descriptor,
-        mcpServers: {
-          "../dev-agents": {
-            command: "node",
-            entry: "mcp/server.mjs"
-          }
-        }
-      }),
-    /unsafe server name/
-  );
-  assert.throws(
-    () =>
-      validatePluginDescriptor({
-        ...descriptor,
-        mcpServers: {
-          "dev-agents": {
-            command: "node --inspect",
-            entry: "mcp/server.mjs"
-          }
-        }
-      }),
-    /safe executable name/
-  );
-
-  for (const entry of [
-    "/mcp/server.mjs",
-    "../mcp/server.mjs",
-    "mcp/../server.mjs",
-    "mcp\\server.mjs",
-    "scripts/server.mjs"
-  ]) {
-    assert.throws(
-      () =>
-        validatePluginDescriptor({
-          ...descriptor,
-          mcpServers: {
-            "dev-agents": {
-              command: "node",
-              entry
-            }
-          }
-        }),
-      /safe relative path under mcp\//
-    );
-  }
-});
-
-test("build rejects a missing MCP source entry", async (t) => {
-  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-mcp-source-"));
-  t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
-  const projectRoot = await copyProjectFixture(temporaryRoot);
-  await rm(join(projectRoot, "plugins", "dev", "mcp", "server.mjs"), { force: true });
-
-  await assert.rejects(
-    build({ projectRoot, outDir: join(temporaryRoot, "dist") }),
-    /MCP server dev-agents entry does not exist: mcp\/server\.mjs/
   );
 });
 
