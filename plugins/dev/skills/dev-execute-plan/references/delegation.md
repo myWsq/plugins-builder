@@ -24,7 +24,7 @@ The prompt contains:
 Dispatch via the host's subagent/task-spawning tool (such as Claude Code's `Agent` tool or an equivalent):
 
 - Pass the full prompt as the subagent's task.
-- Default the model to one tier below the orchestrating model when the host allows model selection; honor a model recorded at the departure check or named by the user. For a non-Claude model, dispatch the user's model-pinned executor agent type instead — see the skill's model-choice rules, including the silent-fallback warning.
+- Default the model to one tier below the orchestrating model when the host allows model selection; honor a model recorded at the departure check or named by the user. For a non-Claude model, dispatch a model-pinned executor agent type instead — this plugin ships `gpt-executor` and `kimi-executor` — see the skill's model-choice rules, including the silent-fallback warning.
 - Run in the background when the host supports it, so the orchestrator can monitor.
 - The subagent works in the current repository on the current branch, inside the host's existing permission envelope.
 

@@ -50,7 +50,7 @@ Selection rules:
 
 If the recorded mode is `subagent` but the host has no subagent tool, fall back to self-execution and say so in the final report: the same host permission envelope is retained and no new consent boundary is crossed.
 
-Model choice: default the subagent to one model tier below the orchestrating model unless the departure check or user named one. The host's runtime model selector accepts Claude tier aliases only. To delegate to a non-Claude model served through the user's API relay, the user pre-creates an executor agent definition (for example in `.claude/agents/`) whose frontmatter pins the full model ID, and the orchestrator dispatches that agent type; offer this route only when such an agent already exists or the user asks for it. An unrecognized or blocked model value silently falls back to the inherited model — tell the user to verify which model actually served the run (for example via relay-side logs).
+Model choice: default the subagent to one model tier below the orchestrating model unless the departure check or user named one. The host's runtime model selector accepts Claude tier aliases only. To delegate to a non-Claude model served through the user's API relay, dispatch a model-pinned executor agent type: this plugin ships `gpt-executor` and `kimi-executor`, and the user may define more (for example in `.claude/agents/`) by pinning a full model ID in the frontmatter. Offer this route only when the departure check recorded it or the user asks for it. An unrecognized or blocked model value silently falls back to the inherited model — tell the user to verify which model actually served the run (for example via relay-side logs).
 
 ### 3. Preflight
 
