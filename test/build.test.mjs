@@ -15,7 +15,7 @@ import {
 } from "../src/build.mjs";
 import { checkRelease } from "../src/check-release.mjs";
 import { validateReleaseTag } from "../src/check-tag.mjs";
-import { syncLocal } from "../src/sync-local.mjs";
+import { syncRelease } from "../src/sync-release.mjs";
 
 async function snapshotTree(root) {
   const snapshot = {};
@@ -387,7 +387,7 @@ test("build removes stale generated files", async (t) => {
   await assert.rejects(readFile(join(outDir, "stale.txt")), { code: "ENOENT" });
 });
 
-test("local sync preserves .git and removes stale output", async (t) => {
+test("release sync preserves .git and removes stale output", async (t) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-sync-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
   const sourceDir = join(temporaryRoot, "dist");
@@ -396,9 +396,9 @@ test("local sync preserves .git and removes stale output", async (t) => {
   await mkdir(join(targetDir, ".git"), { recursive: true });
   await writeFile(join(targetDir, ".git", "HEAD"), "ref: refs/heads/main\n");
 
-  await syncLocal({ sourceDir, targetDir });
+  await syncRelease({ sourceDir, targetDir });
   await writeFile(join(targetDir, "stale.txt"), "stale\n");
-  await syncLocal({ sourceDir, targetDir });
+  await syncRelease({ sourceDir, targetDir });
 
   assert.equal(await readFile(join(targetDir, ".git", "HEAD"), "utf8"), "ref: refs/heads/main\n");
   await assert.rejects(readFile(join(targetDir, "stale.txt")), { code: "ENOENT" });
@@ -408,6 +408,11 @@ test("local sync preserves .git and removes stale output", async (t) => {
       Object.entries(await snapshotTree(targetDir)).filter(([path]) => !path.startsWith(".git/"))
     )
   );
+});
+
+test("release sync refuses to guess a target", async () => {
+  await assert.rejects(syncRelease(), /targetDir is required/);
+  await assert.rejects(syncRelease({}), /targetDir is required/);
 });
 
 test("descriptor validation rejects invalid semver", () => {

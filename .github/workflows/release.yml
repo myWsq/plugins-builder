@@ -68,7 +68,7 @@ jobs:
       - name: Enforce plugin version contract
         run: npm run check:release -- --current release --next dist
       - name: Sync generated tree
-        run: node src/sync-local.mjs --target release
+        run: node src/sync-release.mjs --target release
       - name: Publish
         working-directory: release
         env:

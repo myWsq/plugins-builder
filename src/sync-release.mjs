@@ -36,10 +36,10 @@ function parseArgs(argv) {
   return options;
 }
 
-export async function syncLocal({
-  sourceDir = join(projectRoot, "dist"),
-  targetDir = resolve(projectRoot, "..", "plugins")
-} = {}) {
+export async function syncRelease({ sourceDir = join(projectRoot, "dist"), targetDir } = {}) {
+  if (!targetDir) {
+    throw new Error("targetDir is required: name the generated checkout explicitly");
+  }
   sourceDir = resolve(sourceDir);
   targetDir = resolve(targetDir);
   if (!(await exists(join(sourceDir, ".generated-by-plugins-builder")))) {
@@ -68,6 +68,6 @@ export async function syncLocal({
 
 if (resolve(process.argv[1] || "") === modulePath) {
   const options = parseArgs(process.argv.slice(2));
-  const result = await syncLocal(options);
+  const result = await syncRelease(options);
   process.stdout.write(`Synced ${result.sourceDir} to ${result.targetDir}\n`);
 }

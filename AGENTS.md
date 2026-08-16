@@ -33,13 +33,13 @@ Generated content:
 - `dist/docs/`: copied marketplace documentation, emitted once rather than bundled in each target
   plugin.
 - `dist/README.md`: byte-for-byte copy of `MARKET_README.md`.
-- `../plugins/`: local checkout of the generated marketplace; everything except `.git/` is owned
-  by this builder.
 - `myWsq/plugins@main`: published generated snapshot; the release workflow owns it.
 
-`npm run build` recreates `dist/` from scratch. `sync-local.mjs` removes old generated target
-content but preserves the target repository's `.git/`. Never point the build command directly at
-a Git repository root.
+`npm run build` recreates `dist/` from scratch. `sync-release.mjs` removes old generated target
+content but preserves the target repository's `.git/`; it runs only inside the release workflow,
+against a fresh checkout, and requires an explicit `--target`. Never point the build command
+directly at a Git repository root, and do not keep a sibling `../plugins` checkout for syncing —
+a stale one silently weakens the version gate.
 
 The current compiler ships `skills/` and descriptor-declared `mcp/` runtime files in both plugin
 targets, and ships an optional `hooks/` directory to the Claude bundle only — Codex has no hook
@@ -111,7 +111,7 @@ The two bundles are generated from one canonical source. Do not use symlinks in 
    manifest metadata, marketplace policy, or category changes.
 7. Keep origin/provenance metadata accurate when importing content from another repository.
 8. Run `npm run verify` and inspect both target bundles plus `dist/docs/`.
-9. Optionally run `npm run sync:local` for a local install smoke test.
+9. For a smoke test, install the plugin from `dist/` directly; do not sync into another checkout.
 
 A rename is a removal plus an addition. Plugin removal is blocked by the release gate; implement an
 explicit, reviewed removal mechanism before intentionally withdrawing a plugin.
@@ -152,8 +152,8 @@ npm test
 npm run build
 npm run verify
 npm run check:tag -- v0.2.1
-npm run check:release -- --current ../plugins --next dist
-npm run sync:local
+git clone --depth 1 https://github.com/myWsq/plugins.git /tmp/published
+npm run check:release -- --current /tmp/published --next dist
 ```
 
 - `npm test`: deterministic-build, MCP rendering/source validation, stale-file, sync-safety,
@@ -162,9 +162,8 @@ npm run sync:local
 - `npm run verify`: run tests, then build the real catalog.
 - `npm run check:tag`: require the release tag to match `package.json.version`.
 - `npm run check:release`: enforce installed plugin version monotonicity against a generated
-  baseline.
-- `npm run sync:local`: build and replace the sibling generated checkout while preserving
-  `.git/`. It is for local preview, not the official release path.
+  baseline. The baseline must be a fresh clone of the published snapshot — never a long-lived
+  sibling checkout, which drifts behind and turns the gate into a false pass.
 
 For a traceable local build, set `SOURCE_REVISION=<git-sha>`.
 
@@ -189,8 +188,9 @@ The release job is serialized and never force-pushes.
 
 ## GitHub setup and first release
 
-- Create `myWsq/plugins` with a `main` branch and bootstrap it from a verified local
-  `npm run sync:local` result. It must contain `.generated-by-plugins-builder`.
+- Create `myWsq/plugins` with a `main` branch. Bootstrap it by running
+  `node src/sync-release.mjs --target <checkout>` once against a verified `npm run build`; the
+  result must contain `.generated-by-plugins-builder`. After that the release workflow owns it.
 - Add a dedicated SSH public key to `myWsq/plugins` as a write-enabled deploy key, and store its
   private key in the `myWsq/plugins-builder` Actions secret `MARKETPLACE_REPO_SSH_KEY`.
 - Use this key only for `myWsq/plugins`; never reuse a personal SSH key or share it with another

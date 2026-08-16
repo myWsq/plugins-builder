@@ -10,7 +10,6 @@
     "build": "node src/build.mjs",
     "check:release": "node src/check-release.mjs",
     "check:tag": "node src/check-tag.mjs",
-    "sync:local": "node src/build.mjs && node src/sync-local.mjs",
     "test": "node --test",
     "verify": "npm test && npm run build"
   },

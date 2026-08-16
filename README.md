@@ -10,12 +10,14 @@ The sibling `plugins` repository is generated output and must not be edited by h
 npm ci --ignore-scripts
 npm test
 npm run build
-npm run sync:local
+npm run verify
 ```
 
 - `npm run build` rebuilds `dist/` from scratch.
-- `npm run sync:local` builds and safely syncs `dist/` into `../plugins`, preserving its `.git/`.
 - `npm run verify` runs tests and a real catalog build.
+
+Publishing to the sibling `plugins` repository happens only in the release workflow. There is no
+local sync path: to try a change before releasing, install the plugin from `dist/` directly.
 
 ## Source layout
 
