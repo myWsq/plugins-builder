@@ -514,3 +514,23 @@ test("marketplace documentation is outside the plugin version contract", async (
 
   await checkRelease({ currentDir, nextDir });
 });
+
+test("executor agents state their pinned model in the description", async () => {
+  const agentsDir = join(defaultProjectRoot, "plugins", "dev", "agents");
+  const files = (await readdir(agentsDir)).filter((name) => name.endsWith(".md"));
+  assert.ok(files.length > 0, "expected at least one executor agent");
+
+  for (const file of files) {
+    const source = await readFile(join(agentsDir, file), "utf8");
+    const name = source.match(/^name:\s*(\S+)$/m)?.[1];
+    const model = source.match(/^model:\s*(\S+)$/m)?.[1];
+    const description = source.match(/^description:\s*(.+)$/m)?.[1] ?? "";
+
+    assert.equal(name, file.replace(/\.md$/, ""), `${file}: name must match filename`);
+    assert.ok(model, `${file}: missing pinned model`);
+    assert.ok(
+      description.includes(model),
+      `${file}: description must state the pinned model ${model} verbatim — it is the only copy callers can read at dispatch time`
+    );
+  }
+});
