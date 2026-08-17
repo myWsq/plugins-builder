@@ -11,5 +11,8 @@
     "commit",
     "arch",
     "coflux"
+  ],
+  "removed": [
+    "subagent-model"
   ]
 }

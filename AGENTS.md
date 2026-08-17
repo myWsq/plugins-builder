@@ -17,7 +17,7 @@ verified release tag, and let GitHub Actions replace the generated snapshot.
 
 Authoritative source:
 
-- `catalog/marketplace.json`: marketplace identity and ordered plugin list.
+- `catalog/marketplace.json`: marketplace identity, ordered plugin list, and declared removals.
 - `catalog/plugins/<name>.json`: neutral plugin metadata, plugin version, target policy, MCP server
   descriptors, and origin.
 - `docs/`: free-form marketplace documentation copied verbatim to the release.
@@ -113,8 +113,12 @@ The two bundles are generated from one canonical source. Do not use symlinks in 
 8. Run `npm run verify` and inspect both target bundles plus `dist/docs/`.
 9. For a smoke test, install the plugin from `dist/` directly; do not sync into another checkout.
 
-A rename is a removal plus an addition. Plugin removal is blocked by the release gate; implement an
-explicit, reviewed removal mechanism before intentionally withdrawing a plugin.
+A rename is a removal plus an addition. Plugin removal must be declared: list the withdrawn name in
+`catalog/marketplace.json.removed`. The build validates the list (kebab-case, no duplicates, never
+overlapping active plugins) and emits it as `.removed-plugins.json` in the generated root; the
+release gate rejects any published plugin that disappears from the candidate without appearing in
+that declaration. The declaration is reviewed like any other catalog change; entries may be pruned
+once the published snapshot no longer contains the plugin.
 
 Plugin source must contain real files, not symlinks. Keep secrets out of source and generated
 output. Configuration may name environment variables, but must never contain their values.

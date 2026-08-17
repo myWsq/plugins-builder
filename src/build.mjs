@@ -308,6 +308,14 @@ export async function build({
   invariant(Array.isArray(catalog.plugins) && catalog.plugins.length > 0, "catalog.plugins must be non-empty");
   invariant(new Set(catalog.plugins).size === catalog.plugins.length, "catalog.plugins contains duplicate names");
 
+  const removedPlugins = catalog.removed ?? [];
+  invariant(Array.isArray(removedPlugins), "catalog.removed must be an array when present");
+  invariant(new Set(removedPlugins).size === removedPlugins.length, "catalog.removed contains duplicate names");
+  for (const name of removedPlugins) {
+    invariant(typeof name === "string" && NAME_PATTERN.test(name), `Invalid catalog.removed plugin name: ${name}`);
+    invariant(!catalog.plugins.includes(name), `catalog.removed conflicts with an active plugin: ${name}`);
+  }
+
   const packageJson = await readJson(join(projectRoot, "package.json"));
   const docsRoot = join(projectRoot, "docs");
   const marketReadme = join(projectRoot, "MARKET_README.md");
@@ -411,6 +419,7 @@ export async function build({
       builderVersion: packageJson.version,
       sourceRevision
     });
+    await writeJson(join(temporaryRoot, ".removed-plugins.json"), removedPlugins);
     await writeJson(join(temporaryRoot, ".generated-by-plugins-builder"), {
       schemaVersion: 1,
       marketplace: catalog.name

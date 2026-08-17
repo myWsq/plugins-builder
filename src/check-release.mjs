@@ -199,9 +199,22 @@ export async function checkRelease({
 
   const currentPlugins = await inspectMarketplace(currentDir);
   const nextPlugins = await inspectMarketplace(nextDir);
-  const removed = [...currentPlugins.keys()].filter((name) => !nextPlugins.has(name));
+  const removalManifest = join(nextDir, ".removed-plugins.json");
+  const declaredRemovals = new Set(
+    (await exists(removalManifest)) ? await readJson(removalManifest) : []
+  );
+  for (const name of declaredRemovals) {
+    if (nextPlugins.has(name)) {
+      throw new Error(`Declared removal ${name} is still present in the next marketplace`);
+    }
+  }
+  const removed = [...currentPlugins.keys()].filter(
+    (name) => !nextPlugins.has(name) && !declaredRemovals.has(name)
+  );
   if (removed.length > 0) {
-    throw new Error(`Release would remove plugin(s): ${removed.join(", ")}`);
+    throw new Error(
+      `Release would remove plugin(s) without a catalog.removed declaration: ${removed.join(", ")}`
+    );
   }
 
   for (const [name, next] of nextPlugins) {

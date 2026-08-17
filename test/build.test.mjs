@@ -508,6 +508,40 @@ test("release gate treats marketplace policy as versioned plugin payload", async
   );
 });
 
+test("release gate blocks plugin removal unless declared in catalog.removed", async (t) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-removal-"));
+  t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const currentDir = join(temporaryRoot, "current");
+  const nextDir = join(temporaryRoot, "next");
+  await build({ outDir: currentDir, sourceRevision: "current" });
+
+  const projectRoot = await copyProjectFixture(temporaryRoot);
+  const catalogPath = join(projectRoot, "catalog", "marketplace.json");
+  await updateJson(catalogPath, (catalog) => {
+    catalog.plugins = catalog.plugins.filter((name) => name !== "coflux");
+    delete catalog.removed;
+  });
+  await build({ projectRoot, outDir: nextDir, sourceRevision: "next" });
+  await assert.rejects(
+    checkRelease({ currentDir, nextDir }),
+    /without a catalog\.removed declaration: coflux/
+  );
+
+  await updateJson(catalogPath, (catalog) => {
+    catalog.removed = ["coflux"];
+  });
+  await build({ projectRoot, outDir: nextDir, sourceRevision: "next" });
+  await checkRelease({ currentDir, nextDir });
+
+  await updateJson(catalogPath, (catalog) => {
+    catalog.removed = ["dev"];
+  });
+  await assert.rejects(
+    build({ projectRoot, outDir: join(temporaryRoot, "conflict") }),
+    /catalog\.removed conflicts with an active plugin: dev/
+  );
+});
+
 test("marketplace documentation is outside the plugin version contract", async (t) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-docs-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
