@@ -1,10 +1,10 @@
 {
   "name": "dev",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "displayName": "Dev Skills",
   "description": "Plan-driven software development with subagent delegation: explore, plan, execute, and review.",
   "shortDescription": "Explore, plan, delegate, execute, and review software changes.",
-  "longDescription": "Dev packages three plan-driven development skills: dev-explore maps the codebase and converges on a direction, dev-write-plan turns that direction into an outcome contract under wiki/plans/, and dev-execute-plan implements the plan — delegating implementation to a host subagent by default — before verifying the result.",
+  "longDescription": "Dev packages four skills: the three plan-driven development skills plus a cross-cutting model-tiering framework. dev-explore maps the codebase and converges on a direction, dev-write-plan turns that direction into an outcome contract under wiki/plans/, and dev-execute-plan implements the plan — delegating implementation to a host subagent by default — before verifying the result. subagent-model injects the owner's model-tiering rule at session start (Claude Code only) and ships it as a consultable skill: mechanically verifiable work drops two or more tiers, self-contained work drops one, and trusted-conclusion work keeps the parent tier.",
   "author": {
     "name": "Shuaiqi Wang",
     "email": "wsq961@outlook.com",
@@ -18,18 +18,22 @@
     "planning",
     "skills",
     "code-review",
-    "agent-delegation"
+    "agent-delegation",
+    "model-selection"
   ],
   "capabilities": [
     "Skills",
     "Planning",
     "Code Review",
-    "Subagent Delegation"
+    "Subagent Delegation",
+    "Hooks"
   ],
   "defaultPrompt": [
     "Use dev-explore to understand this codebase and converge on an approach.",
     "Use dev-write-plan to turn this requirement into an implementation plan.",
-    "Use dev-execute-plan to implement a TODO plan and review the result."
+    "Use dev-execute-plan to implement a TODO plan and review the result.",
+    "Use subagent-model to pick the model tier for this subtask.",
+    "Use subagent-model to decide whether this delegation can run on a cheaper tier."
   ],
   "brandColor": "#2563EB",
   "targets": {
