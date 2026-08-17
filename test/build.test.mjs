@@ -228,13 +228,13 @@ test("build ships plugin hooks to the Claude bundle only", async (t) => {
   await build({ outDir, sourceRevision: "test-revision" });
 
   const sourceHooks = await snapshotTree(
-    join(defaultProjectRoot, "plugins", "subagent-model", "hooks")
+    join(defaultProjectRoot, "plugins", "dev", "hooks")
   );
   assert.deepEqual(
-    await snapshotTree(join(outDir, "claude-plugins", "subagent-model", "hooks")),
+    await snapshotTree(join(outDir, "claude-plugins", "dev", "hooks")),
     sourceHooks
   );
-  await assert.rejects(lstat(join(outDir, "plugins", "subagent-model", "hooks")), {
+  await assert.rejects(lstat(join(outDir, "plugins", "dev", "hooks")), {
     code: "ENOENT"
   });
 });
@@ -259,7 +259,7 @@ test("build rejects a plugin hooks directory without valid hooks.json", async (t
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-hooks-invalid-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
   const projectRoot = await copyProjectFixture(temporaryRoot);
-  const hooksJson = join(projectRoot, "plugins", "subagent-model", "hooks", "hooks.json");
+  const hooksJson = join(projectRoot, "plugins", "dev", "hooks", "hooks.json");
 
   await writeFile(hooksJson, "{ not json\n");
   await assert.rejects(
