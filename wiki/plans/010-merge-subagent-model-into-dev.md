@@ -69,6 +69,10 @@ renames the skill, or leaves a dangling reference to the deleted plugin.
   and the SessionStart hook; `defaultPrompt` gains the subagent-model prompts
   from `catalog/plugins/subagent-model.json:29-31`; merge meaningful keywords
   (e.g. `model-selection`). Exact wording is the executor's call.
+  *Deviation during execution*: the compiler caps `defaultPrompt` at 3
+  entries (`src/build.mjs`, `validatePluginDescriptor`), a constraint
+  exploration missed — the two subagent-model prompts were dropped from
+  `defaultPrompt` and remain as examples in `docs/dev.md` only.
 - **Docs** (decided while planning): fold `docs/subagent-model.md`'s rule
   table and component description into `docs/dev.md` as a section (a fourth
   row in its Skills table plus a short hook note fits its structure); delete
