@@ -31,9 +31,7 @@
   "defaultPrompt": [
     "Use dev-explore to understand this codebase and converge on an approach.",
     "Use dev-write-plan to turn this requirement into an implementation plan.",
-    "Use dev-execute-plan to implement a TODO plan and review the result.",
-    "Use subagent-model to pick the model tier for this subtask.",
-    "Use subagent-model to decide whether this delegation can run on a cheaper tier."
+    "Use dev-execute-plan to implement a TODO plan and review the result."
   ],
   "brandColor": "#2563EB",
   "targets": {
