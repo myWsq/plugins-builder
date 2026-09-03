@@ -61,6 +61,27 @@ async function copyProjectFixture(temporaryRoot) {
   return projectRoot;
 }
 
+async function writeHooksFixture(projectRoot, plugin) {
+  const hooksRoot = join(projectRoot, "plugins", plugin, "hooks");
+  await mkdir(hooksRoot, { recursive: true });
+  await writeFile(join(hooksRoot, "rules.md"), "# Fixture rule\n");
+  await writeFile(
+    join(hooksRoot, "hooks.json"),
+    JSON.stringify(
+      {
+        hooks: {
+          SessionStart: [
+            { hooks: [{ type: "command", command: "cat", args: ["${CLAUDE_PLUGIN_ROOT}/hooks/rules.md"] }] }
+          ]
+        }
+      },
+      null,
+      2
+    ) + "\n"
+  );
+  return hooksRoot;
+}
+
 async function assertRenderedSkillTree(sourceRoot, generatedRoot, target, fragments = new Map()) {
   const sourceTree = await snapshotTree(sourceRoot);
   const generatedTree = await snapshotTree(generatedRoot);
@@ -224,15 +245,14 @@ test("build emits the commit plugin with fragment-expanded skills in both bundle
 test("build ships plugin hooks to the Claude bundle only", async (t) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-hooks-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const projectRoot = await copyProjectFixture(temporaryRoot);
+  const hooksRoot = await writeHooksFixture(projectRoot, "dev");
   const outDir = join(temporaryRoot, "dist");
-  await build({ outDir, sourceRevision: "test-revision" });
+  await build({ projectRoot, outDir, sourceRevision: "test-revision" });
 
-  const sourceHooks = await snapshotTree(
-    join(defaultProjectRoot, "plugins", "dev", "hooks")
-  );
   assert.deepEqual(
     await snapshotTree(join(outDir, "claude-plugins", "dev", "hooks")),
-    sourceHooks
+    await snapshotTree(hooksRoot)
   );
   await assert.rejects(lstat(join(outDir, "plugins", "dev", "hooks")), {
     code: "ENOENT"
@@ -259,7 +279,7 @@ test("build rejects a plugin hooks directory without valid hooks.json", async (t
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-hooks-invalid-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
   const projectRoot = await copyProjectFixture(temporaryRoot);
-  const hooksJson = join(projectRoot, "plugins", "dev", "hooks", "hooks.json");
+  const hooksJson = join(await writeHooksFixture(projectRoot, "dev"), "hooks.json");
 
   await writeFile(hooksJson, "{ not json\n");
   await assert.rejects(

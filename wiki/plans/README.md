@@ -11,4 +11,3 @@ Numbering continues from the legacy root `plans/` archive (001–002).
 | [007](007-coflux-plugin.md) | DONE | self | none |
 | [008](008-remove-dev-agents-broker.md) | DONE | self | none |
 | [009](009-plugin-executor-agents.md) | DONE | self | 008 |
-| [010](010-merge-subagent-model-into-dev.md) | DONE | subagent dev:grok-executor | none |
