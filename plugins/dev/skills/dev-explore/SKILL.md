@@ -25,15 +25,15 @@ Clarify the requirement — for a change its consumer can perceive, the product 
 
 Classify the request before reading the implementation or asking detailed questions. Read only what classification needs: the request itself, `README`, and the directory layout.
 
-- **Pure exploration**: the user wants to understand code, behavior, risks, or validation. Report findings and stop.
-- **Clear, narrow change**: confirm the inferred requirement and relevant constraints, then go straight to the departure check.
+- **Pure exploration**: the user wants to understand code, behavior, risks, or validation. Run recon (step 3), report, and stop.
+- **Clear, narrow change**: confirm the inferred requirement and relevant constraints, run recon (step 3), then go straight to the departure check.
 - **Open-ended or behavior-changing request**: explore alternatives and get approval for a direction before `dev-write-plan`.
 - **Plan or design stress-test**: the user has an existing plan (such as `wiki/plans/20260821-share-link-claim`) or design document and wants it grilled. Read it, verify its claims against the code, then grill through its decisions and assumptions branch by branch. The output is revision notes for `dev-write-plan` or the user, not a new direction.
 - **Too broad for one plan**: identify independent pieces, explain the split, and recommend the first slice to explore.
 
 Do not let "this seems simple" skip clarification. For simple changes, the approved direction can be one or two sentences.
 
-For any request that proposes a change, also decide — independently of the category — whether the change is **perceptible**: it alters what the consumer of the change sees or does. The consumer is whoever uses the result: a GUI user, a CLI user, an API caller, a skill invoker. Pages, interaction, flows, copy, CLI commands, flags, and output, the shape of an API call, a skill's prompt or response are perceptible surfaces. An internal bug fix, a refactor, infrastructure, or performance work has no perceptible surface. A perceptible change goes through step 2 before anything else, whatever its category — a clear, narrow change included. A non-perceptible change skips step 2. The user can force or skip step 2 by saying so.
+For any request that proposes a change, also decide — independently of the category — whether the change is **perceptible**: it alters what the consumer of the change sees or does. The consumer is whoever uses the result: a GUI user, a CLI user, an API caller, a skill invoker. Pages, interaction, flows, copy, CLI commands, flags, and output, the shape of an API call, a skill's prompt or response are perceptible surfaces. An internal bug fix, a refactor, infrastructure, or performance work has no perceptible surface. A perceptible change goes through step 2 before anything else, whatever its category — a clear, narrow change included. A non-perceptible change skips step 2. A request too broad for one plan is split first; perceptibility is decided for the slice being explored, not for the whole. The user can force or skip step 2 by saying so.
 
 ### 2. Clarify the product (perceptible changes only)
 

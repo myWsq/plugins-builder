@@ -91,8 +91,8 @@ The problem, its impact, and what is true once this is done — written so the
 executor can tell a correct solution from an adjacent wrong one. For a change
 its consumer can perceive, this section also carries the product conclusions
 settled in exploration: the interaction flow, the states, the UI structure,
-the scope cut, and what the consumer can observe when done. They live here and
-nowhere else.
+the scope cut, and what the consumer can observe when done. They live in the
+plan, not in a separate artifact.
 
 ## Decisions & tradeoffs
 
