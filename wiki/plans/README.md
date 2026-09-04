@@ -12,3 +12,4 @@ Numbering continues from the legacy root `plans/` archive (001–002).
 | [008](008-remove-dev-agents-broker.md) | DONE | self | none |
 | [009](009-plugin-executor-agents.md) | DONE | self | 008 |
 | [20260903-explore-product-clarify](20260903-explore-product-clarify.md) | DONE | self | none |
+| [20260904-explore-advisor-escalation](20260904-explore-advisor-escalation.md) | TODO | subagent (opus) | none |
