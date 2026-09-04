@@ -92,14 +92,14 @@ call and let the tie be broken on evidence.
 ```text
 Use dev-explore to understand how authentication works in this repo.
 Use dev-explore to grill me about this refactoring idea before we plan it.
-Use dev-explore to stress-test wiki/plans/003 before we execute it.
+Use dev-explore to stress-test wiki/plans/20260821-share-link-claim before we execute it.
 
 Use dev-write-plan to plan adding password reset support.
 Use dev-write-plan to turn this bug report into an implementation plan.
 
-Use dev-execute-plan to implement wiki/plans/001.
+Use dev-execute-plan to implement wiki/plans/20260821-share-link-claim.
 Use dev-execute-plan to execute the next TODO plan.
-Use dev-execute-plan to delegate wiki/plans/002 to a subagent and review the result.
+Use dev-execute-plan to delegate wiki/plans/20260822-rate-limit-headers to a subagent and review the result.
 Use dev-execute-plan to run plans 002 and 003 in parallel.
 
 Use dev-advisor to get a second opinion before I commit to this approach.

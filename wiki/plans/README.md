@@ -1,6 +1,6 @@
 # Plans
 
-Numbering continues from the legacy root `plans/` archive (001–002).
+Plans are named `YYYYMMDD-short-slug`. The numbered entries (003–009) predate that convention and continue the legacy root `plans/` archive (001–002).
 
 | Plan | Status | Execution | Depends on |
 | --- | --- | --- | --- |
