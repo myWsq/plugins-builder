@@ -233,3 +233,9 @@ builder's fragment compiler. Never run upstream build scripts during collection,
 refs, or duplicate upstream metadata in the catalog. Changes to their payload or marketplace entry
 still require a strictly greater upstream plugin version. Keep source read credentials separate
 from the marketplace publishing credential. Do not expose private source credentials to fork PRs.
+
+## Repository language
+
+Write skill instructions, documentation, and code comments in English. The conversation's language
+does not change the repository's authoring language. Existing multilingual trigger examples may
+remain where they illustrate user requests.

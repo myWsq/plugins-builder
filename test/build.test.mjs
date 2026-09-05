@@ -194,8 +194,8 @@ test("build emits a deterministic Claude Code marketplace", async (t) => {
   }
 });
 
-test("build emits the commit plugin with fragment-expanded skills", async (t) => {
-  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-commit-"));
+test("build emits the git plugin with fragment-expanded skills", async (t) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-git-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
   const outDir = join(temporaryRoot, "dist");
   await build({ outDir, sourceRevision: "test-revision" });
@@ -203,25 +203,29 @@ test("build emits the commit plugin with fragment-expanded skills", async (t) =>
   const marketplace = JSON.parse(
     await readFile(join(outDir, ".claude-plugin", "marketplace.json"), "utf8")
   );
-  assert.ok(marketplace.plugins.some((entry) => entry.name === "commit"));
+  assert.ok(marketplace.plugins.some((entry) => entry.name === "git"));
+  assert.ok(!marketplace.plugins.some((entry) => entry.name === "commit"));
+  const removed = JSON.parse(await readFile(join(outDir, ".removed-plugins.json"), "utf8"));
+  assert.ok(removed.includes("commit"));
+  await assert.rejects(lstat(join(outDir, "plugins", "commit")), { code: "ENOENT" });
 
-  const fragments = await loadFragmentFixture("commit");
-  assert.ok(fragments.has("commit-flow"), "the commit plugin still ships the shared commit flow");
+  const fragments = await loadFragmentFixture("git");
+  assert.ok(fragments.has("commit-flow"), "the git plugin still ships the shared commit flow");
   await assertRenderedSkillTree(
-    join(defaultProjectRoot, "plugins", "commit", "skills"),
-    join(outDir, "plugins", "commit", "skills"),
+    join(defaultProjectRoot, "plugins", "git", "skills"),
+    join(outDir, "plugins", "git", "skills"),
     fragments
   );
 
   for (const skill of ["commit", "push", "pr", "clean"]) {
-    const rendered = await readFile(join(outDir, "plugins", "commit", "skills", skill, "SKILL.md"), "utf8");
+    const rendered = await readFile(join(outDir, "plugins", "git", "skills", skill, "SKILL.md"), "utf8");
     assert.doesNotMatch(rendered, /<!--[\t ]*include\b/, `${skill} includes`);
   }
   for (const skill of ["commit", "push", "pr"]) {
-    const rendered = await readFile(join(outDir, "plugins", "commit", "skills", skill, "SKILL.md"), "utf8");
+    const rendered = await readFile(join(outDir, "plugins", "git", "skills", skill, "SKILL.md"), "utf8");
     assert.match(rendered, /mirrors the host's standard commit workflow/, `${skill} expands commit-flow`);
   }
-  await assert.rejects(lstat(join(outDir, "plugins", "commit", "fragments")), { code: "ENOENT" });
+  await assert.rejects(lstat(join(outDir, "plugins", "git", "fragments")), { code: "ENOENT" });
 });
 
 test("build ships plugin hooks into the bundle", async (t) => {
@@ -236,7 +240,7 @@ test("build ships plugin hooks into the bundle", async (t) => {
     await snapshotTree(join(outDir, "plugins", "dev", "hooks")),
     await snapshotTree(hooksRoot)
   );
-  await assert.rejects(lstat(join(outDir, "plugins", "commit", "hooks")), { code: "ENOENT" });
+  await assert.rejects(lstat(join(outDir, "plugins", "git", "hooks")), { code: "ENOENT" });
 });
 
 test("build ships plugin agents into the bundle", async (t) => {
@@ -249,7 +253,7 @@ test("build ships plugin agents into the bundle", async (t) => {
     await snapshotTree(join(outDir, "plugins", "dev", "agents")),
     await snapshotTree(join(defaultProjectRoot, "plugins", "dev", "agents"))
   );
-  await assert.rejects(lstat(join(outDir, "plugins", "commit", "agents")), { code: "ENOENT" });
+  await assert.rejects(lstat(join(outDir, "plugins", "git", "agents")), { code: "ENOENT" });
 });
 
 test("build rejects a plugin hooks directory without valid hooks.json", async (t) => {
@@ -325,7 +329,7 @@ test("build rejects directives inside skill fragments", async (t) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-fragment-source-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
   const projectRoot = await copyProjectFixture(temporaryRoot);
-  const fragment = join(projectRoot, "plugins", "commit", "fragments", "commit-flow.md");
+  const fragment = join(projectRoot, "plugins", "git", "fragments", "commit-flow.md");
 
   for (const text of [
     "<!-- include another-fragment -->\n",

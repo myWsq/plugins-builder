@@ -7,9 +7,12 @@
   },
   "plugins": [
     "dev",
-    "commit",
+    "git",
     "arch",
     "coflux",
     "market"
+  ],
+  "removed": [
+    "commit"
   ]
 }
