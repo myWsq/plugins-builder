@@ -7,11 +7,9 @@ const modulePath = fileURLToPath(import.meta.url);
 export const defaultProjectRoot = resolve(dirname(modulePath), "..");
 
 const NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const CODEX_INSTALLATION = new Set(["NOT_AVAILABLE", "AVAILABLE", "INSTALLED_BY_DEFAULT"]);
-const CODEX_AUTHENTICATION = new Set(["ON_INSTALL", "ON_USE"]);
-const SKILL_TARGETS = new Set(["claude", "codex"]);
-const TARGET_DIRECTIVE_PATTERN = /^[\t ]*<!--[\t ]*(\/)?(claude|codex)[\t ]*-->[\t ]*$/;
-const KNOWN_TARGET_DIRECTIVE_PATTERN = /<!--[\t ]*\/?(?:claude|codex)[\t ]*-->/;
+// The compiler once rendered per-target blocks for a second bundle. Those markers are retired: the
+// build ships one Claude Code bundle, so a leftover marker is a source error, never shipped text.
+const RETIRED_TARGET_DIRECTIVE_PATTERN = /<!--[\t ]*\/?(?:claude|codex)[\t ]*-->/;
 const FRAGMENT_FILE_PATTERN = /^([a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
 const INCLUDE_DIRECTIVE_PATTERN = /^[\t ]*<!--[\t ]*include[\t ]+([a-z0-9]+(?:-[a-z0-9]+)*)[\t ]*-->[\t ]*$/;
 const KNOWN_INCLUDE_DIRECTIVE_PATTERN = /<!--[\t ]*include\b.*-->/;
@@ -65,24 +63,9 @@ export function validatePluginDescriptor(plugin, expectedName = plugin?.name) {
   invariant(plugin.name === expectedName, `plugin descriptor name ${plugin.name} must match catalog name ${expectedName}`);
   requireString(plugin.version, `${plugin.name}.version`);
   invariant(semver.valid(plugin.version) === plugin.version, `${plugin.name}.version must be strict semver`);
-  requireString(plugin.displayName, `${plugin.name}.displayName`);
   requireString(plugin.description, `${plugin.name}.description`);
-  requireString(plugin.shortDescription, `${plugin.name}.shortDescription`);
-  requireString(plugin.longDescription, `${plugin.name}.longDescription`);
   requireString(plugin.author?.name, `${plugin.name}.author.name`);
-  requireString(plugin.targets?.claude?.category, `${plugin.name}.targets.claude.category`);
-  requireString(plugin.targets?.codex?.category, `${plugin.name}.targets.codex.category`);
-  invariant(Array.isArray(plugin.capabilities) && plugin.capabilities.length > 0, `${plugin.name}.capabilities must be non-empty`);
-  invariant(Array.isArray(plugin.defaultPrompt) && plugin.defaultPrompt.length <= 3, `${plugin.name}.defaultPrompt must contain at most 3 prompts`);
-  for (const [index, prompt] of plugin.defaultPrompt.entries()) {
-    requireString(prompt, `${plugin.name}.defaultPrompt[${index}]`);
-    invariant(prompt.length <= 128, `${plugin.name}.defaultPrompt[${index}] exceeds 128 characters`);
-  }
-
-  const policy = plugin.targets.codex.policy;
-  invariant(policy && typeof policy === "object", `${plugin.name}.targets.codex.policy is required`);
-  invariant(CODEX_INSTALLATION.has(policy.installation), `invalid Codex installation policy for ${plugin.name}`);
-  invariant(CODEX_AUTHENTICATION.has(policy.authentication), `invalid Codex authentication policy for ${plugin.name}`);
+  requireString(plugin.category, `${plugin.name}.category`);
 }
 
 export async function assertPortableTree(root) {
@@ -105,56 +88,6 @@ export async function assertPortableTree(root) {
   }
 
   await visit(root);
-}
-
-export function renderTargetMarkdown(text, target, sourcePath = "Markdown source") {
-  invariant(SKILL_TARGETS.has(target), `Unsupported skill target: ${target}`);
-  let activeTarget;
-  let foundDirective = false;
-  const output = [];
-
-  for (const line of text.split(/(?<=\n)/)) {
-    const content = line.endsWith("\n")
-      ? line.slice(0, line.endsWith("\r\n") ? -2 : -1)
-      : line;
-    const directive = content.match(TARGET_DIRECTIVE_PATTERN);
-
-    if (!directive) {
-      invariant(
-        !KNOWN_TARGET_DIRECTIVE_PATTERN.test(content),
-        `Invalid target directive in ${sourcePath}: directives must occupy their own line`
-      );
-      if (activeTarget === undefined || activeTarget === target) output.push(line);
-      continue;
-    }
-
-    foundDirective = true;
-    const closing = directive[1] === "/";
-    const directiveTarget = directive[2];
-    if (closing) {
-      invariant(
-        activeTarget !== undefined,
-        `Invalid target directive in ${sourcePath}: closing ${directiveTarget} without an open block`
-      );
-      invariant(
-        activeTarget === directiveTarget,
-        `Invalid target directive in ${sourcePath}: closing ${directiveTarget} while ${activeTarget} is open`
-      );
-      activeTarget = undefined;
-    } else {
-      invariant(
-        activeTarget === undefined,
-        `Invalid target directive in ${sourcePath}: nested ${directiveTarget} block inside ${activeTarget}`
-      );
-      activeTarget = directiveTarget;
-    }
-  }
-
-  invariant(
-    activeTarget === undefined,
-    `Invalid target directive in ${sourcePath}: unclosed ${activeTarget} block`
-  );
-  return foundDirective ? output.join("") : text;
 }
 
 export function expandSkillFragments(text, fragments, sourcePath = "Markdown source") {
@@ -180,6 +113,13 @@ export function expandSkillFragments(text, fragments, sourcePath = "Markdown sou
   return output.join("");
 }
 
+function assertNoRetiredDirectives(text, sourcePath) {
+  invariant(
+    !RETIRED_TARGET_DIRECTIVE_PATTERN.test(text),
+    `Retired target directive in ${sourcePath}: per-target blocks are no longer supported, remove the marker`
+  );
+}
+
 async function loadSkillFragments(sourceRoot) {
   const fragmentsRoot = join(sourceRoot, "fragments");
   if (!(await pathExists(fragmentsRoot))) return new Map();
@@ -199,7 +139,7 @@ async function loadSkillFragments(sourceRoot) {
     const text = await readFile(path, "utf8");
     invariant(text.endsWith("\n"), `Skill fragment must end with a newline: ${path}`);
     invariant(
-      !KNOWN_TARGET_DIRECTIVE_PATTERN.test(text) && !KNOWN_INCLUDE_DIRECTIVE_PATTERN.test(text),
+      !RETIRED_TARGET_DIRECTIVE_PATTERN.test(text) && !KNOWN_INCLUDE_DIRECTIVE_PATTERN.test(text),
       `Skill fragment must not contain target or include directives: ${path}`
     );
     fragments.set(match[1], text);
@@ -207,7 +147,7 @@ async function loadSkillFragments(sourceRoot) {
   return fragments;
 }
 
-async function copySkillTree(sourceRoot, destinationRoot, target, fragments) {
+async function renderSkillTree(sourceRoot, destinationRoot, fragments) {
   await cp(sourceRoot, destinationRoot, { recursive: true });
 
   async function visit(directory) {
@@ -220,8 +160,8 @@ async function copySkillTree(sourceRoot, destinationRoot, target, fragments) {
       } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".md")) {
         const text = await readFile(path, "utf8");
         const sourcePath = join(sourceRoot, relative(destinationRoot, path));
-        const targeted = renderTargetMarkdown(text, target, sourcePath);
-        const rendered = expandSkillFragments(targeted, fragments, sourcePath);
+        assertNoRetiredDirectives(text, sourcePath);
+        const rendered = expandSkillFragments(text, fragments, sourcePath);
         if (rendered !== text) await writeFile(path, rendered, "utf8");
       }
     }
@@ -230,7 +170,7 @@ async function copySkillTree(sourceRoot, destinationRoot, target, fragments) {
   await visit(destinationRoot);
 }
 
-function claudePluginManifest(plugin) {
+function pluginManifest(plugin) {
   return {
     name: plugin.name,
     version: plugin.version,
@@ -241,32 +181,6 @@ function claudePluginManifest(plugin) {
     license: plugin.license,
     keywords: plugin.keywords
   };
-}
-
-function codexPluginManifest(plugin) {
-  const manifest = {
-    name: plugin.name,
-    version: plugin.version,
-    description: plugin.description,
-    author: plugin.author,
-    homepage: plugin.homepage,
-    repository: plugin.repository,
-    license: plugin.license,
-    keywords: plugin.keywords,
-    skills: "./skills/",
-    interface: {
-      displayName: plugin.displayName,
-      shortDescription: plugin.shortDescription,
-      longDescription: plugin.longDescription,
-      developerName: plugin.author.name,
-      category: plugin.targets.codex.category,
-      capabilities: plugin.capabilities,
-      websiteURL: plugin.homepage,
-      defaultPrompt: plugin.defaultPrompt,
-      brandColor: plugin.brandColor
-    }
-  };
-  return manifest;
 }
 
 function parseArgs(argv) {
@@ -302,7 +216,6 @@ export async function build({
   const catalog = await readJson(join(projectRoot, "catalog", "marketplace.json"));
   requireString(catalog.name, "catalog.name");
   invariant(NAME_PATTERN.test(catalog.name), "catalog.name must be kebab-case");
-  requireString(catalog.displayName, "catalog.displayName");
   requireString(catalog.description, "catalog.description");
   requireString(catalog.owner?.name, "catalog.owner.name");
   invariant(Array.isArray(catalog.plugins) && catalog.plugins.length > 0, "catalog.plugins must be non-empty");
@@ -342,57 +255,31 @@ export async function build({
 
   try {
     await mkdir(temporaryRoot, { recursive: true });
-    const claudeEntries = [];
-    const codexEntries = [];
+    const entries = [];
 
     for (const plugin of plugins) {
       const sourceRoot = join(projectRoot, "plugins", plugin.name);
-      const claudeRoot = join(temporaryRoot, "claude-plugins", plugin.name);
-      const codexRoot = join(temporaryRoot, "plugins", plugin.name);
+      const bundleRoot = join(temporaryRoot, "plugins", plugin.name);
       const skillFragments = await loadSkillFragments(sourceRoot);
 
-      await mkdir(join(claudeRoot, ".claude-plugin"), { recursive: true });
-      await mkdir(join(codexRoot, ".codex-plugin"), { recursive: true });
-      await copySkillTree(
-        join(sourceRoot, "skills"),
-        join(claudeRoot, "skills"),
-        "claude",
-        skillFragments
-      );
-      await copySkillTree(
-        join(sourceRoot, "skills"),
-        join(codexRoot, "skills"),
-        "codex",
-        skillFragments
-      );
-      if (await pathExists(join(sourceRoot, "hooks"))) {
-        await cp(join(sourceRoot, "hooks"), join(claudeRoot, "hooks"), { recursive: true });
+      await mkdir(join(bundleRoot, ".claude-plugin"), { recursive: true });
+      await renderSkillTree(join(sourceRoot, "skills"), join(bundleRoot, "skills"), skillFragments);
+      for (const component of ["hooks", "agents"]) {
+        if (await pathExists(join(sourceRoot, component))) {
+          await cp(join(sourceRoot, component), join(bundleRoot, component), { recursive: true });
+        }
       }
-      if (await pathExists(join(sourceRoot, "agents"))) {
-        await cp(join(sourceRoot, "agents"), join(claudeRoot, "agents"), { recursive: true });
-      }
-      await cp(join(projectRoot, "LICENSE"), join(claudeRoot, "LICENSE"));
-      await cp(join(projectRoot, "LICENSE"), join(codexRoot, "LICENSE"));
-      await writeJson(join(claudeRoot, ".claude-plugin", "plugin.json"), claudePluginManifest(plugin));
-      await writeJson(join(codexRoot, ".codex-plugin", "plugin.json"), codexPluginManifest(plugin));
+      await cp(join(projectRoot, "LICENSE"), join(bundleRoot, "LICENSE"));
+      await writeJson(join(bundleRoot, ".claude-plugin", "plugin.json"), pluginManifest(plugin));
 
-      claudeEntries.push({
+      entries.push({
         name: plugin.name,
-        source: `./claude-plugins/${plugin.name}`,
+        source: `./plugins/${plugin.name}`,
         version: plugin.version,
         description: plugin.description,
         author: plugin.author,
-        category: plugin.targets.claude.category,
+        category: plugin.category,
         homepage: plugin.homepage
-      });
-      codexEntries.push({
-        name: plugin.name,
-        source: {
-          source: "local",
-          path: `./plugins/${plugin.name}`
-        },
-        policy: plugin.targets.codex.policy,
-        category: plugin.targets.codex.category
       });
     }
 
@@ -402,14 +289,7 @@ export async function build({
       metadata: {
         description: catalog.description
       },
-      plugins: claudeEntries
-    });
-    await writeJson(join(temporaryRoot, ".agents", "plugins", "marketplace.json"), {
-      name: catalog.name,
-      interface: {
-        displayName: catalog.displayName
-      },
-      plugins: codexEntries
+      plugins: entries
     });
     await cp(docsRoot, join(temporaryRoot, "docs"), { recursive: true });
     await cp(join(projectRoot, "LICENSE"), join(temporaryRoot, "LICENSE"));

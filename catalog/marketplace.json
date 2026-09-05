@@ -1,6 +1,5 @@
 {
   "name": "plugins",
-  "displayName": "WSQ Plugins",
   "description": "A personal marketplace of reusable skills, MCP integrations, and agent workflows.",
   "owner": {
     "name": "Shuaiqi Wang",

@@ -5,12 +5,6 @@ description: Consult a top-tier read-only advisor before committing to an approa
 
 # dev-advisor
 
-<!-- codex -->
-Consulting an advisor needs a subagent mechanism, which Codex does not have.
-Continue the work without it, and say so only if the user asks for a second
-opinion by name.
-<!-- /codex -->
-<!-- claude -->
 Dispatch the host's generic subagent with `model` set to the top Claude tier
 (`fable`) and brief it as an advisor: a reviewer that arrives with fresh
 context, reads the code itself rather than your account of it, and answers
@@ -105,4 +99,3 @@ answer into the new brief — a reconcile call is cheaper than committing to the
 wrong branch.
 
 Relay what the advisor changed in your plan — the user cannot see its report.
-<!-- /claude -->

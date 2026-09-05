@@ -1,10 +1,7 @@
 {
   "name": "dev",
-  "version": "0.15.0",
-  "displayName": "Dev Skills",
+  "version": "0.15.1",
   "description": "Plan-driven software development with subagent delegation: explore, plan, execute, and review.",
-  "shortDescription": "Explore, plan, delegate, execute, and review software changes.",
-  "longDescription": "Dev packages four skills: the three plan-driven development skills plus a second-opinion advisor. dev-explore clarifies a perceptible change from its consumer's side first, then maps the codebase and converges on a direction, dev-write-plan turns that direction into an outcome contract under wiki/plans/, and dev-execute-plan implements the plan — delegating implementation to a host subagent by default — before verifying the result. dev-advisor (Claude Code only) briefs a top-tier subagent as a read-only advisor, reading the repository with fresh context, before an approach hardens or work is declared done.",
   "author": {
     "name": "Shuaiqi Wang",
     "email": "wsq961@outlook.com",
@@ -20,28 +17,5 @@
     "code-review",
     "agent-delegation"
   ],
-  "capabilities": [
-    "Skills",
-    "Planning",
-    "Code Review",
-    "Subagent Delegation"
-  ],
-  "defaultPrompt": [
-    "Use dev-explore to understand this codebase and converge on an approach.",
-    "Use dev-write-plan to turn this requirement into an implementation plan.",
-    "Use dev-execute-plan to implement a TODO plan and review the result."
-  ],
-  "brandColor": "#2563EB",
-  "targets": {
-    "claude": {
-      "category": "development"
-    },
-    "codex": {
-      "category": "Developer Tools",
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_INSTALL"
-      }
-    }
-  }
+  "category": "development"
 }

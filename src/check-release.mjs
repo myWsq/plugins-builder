@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { lstat, readFile, readdir } from "node:fs/promises";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import semver from "semver";
 
@@ -54,13 +54,6 @@ function indexEntries(entries, label) {
   return result;
 }
 
-function sameNames(left, right) {
-  return (
-    left.size === right.size &&
-    [...left.keys()].every((name) => right.has(name))
-  );
-}
-
 async function digestTree(root) {
   const hash = createHash("sha256");
 
@@ -89,76 +82,54 @@ async function digestTree(root) {
   return hash.digest("hex");
 }
 
-async function directoryNames(path) {
-  const entries = await readdir(path, { withFileTypes: true });
-  const names = new Set();
-  for (const entry of entries) {
-    if (!entry.isDirectory() || entry.isSymbolicLink()) {
-      throw new Error(`Unexpected entry in plugin collection: ${join(path, entry.name)}`);
-    }
-    names.add(entry.name);
+// The plugin root is wherever the marketplace entry points. The bundle directory has moved once
+// already, and the gate must read the published snapshot and the candidate alike, so no layout
+// prefix is assumed here — only that the entry stays inside the marketplace root.
+async function resolvePluginRoot(root, name, source) {
+  if (typeof source !== "string" || source === "" || isAbsolute(source)) {
+    throw new Error(`Plugin ${name} must declare a relative source path: ${stableJson(source)}`);
   }
-  return names;
+  const pluginRoot = resolve(root, source);
+  const inside = relative(root, pluginRoot);
+  if (inside === "" || inside === ".." || inside.startsWith(`..${sep}`) || isAbsolute(inside)) {
+    throw new Error(`Plugin ${name} source must stay inside the marketplace root: ${source}`);
+  }
+  let stat;
+  try {
+    stat = await lstat(pluginRoot);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  if (!stat || stat.isSymbolicLink() || !stat.isDirectory()) {
+    throw new Error(`Plugin ${name} source is not a directory in the marketplace: ${source}`);
+  }
+  return pluginRoot;
 }
 
 async function inspectMarketplace(root) {
-  const claudeMarketplace = await readJson(join(root, ".claude-plugin", "marketplace.json"));
-  const codexMarketplace = await readJson(join(root, ".agents", "plugins", "marketplace.json"));
-  const claudeEntries = indexEntries(claudeMarketplace.plugins, "Claude marketplace");
-  const codexEntries = indexEntries(codexMarketplace.plugins, "Codex marketplace");
-  if (!sameNames(claudeEntries, codexEntries)) {
-    throw new Error("Claude and Codex marketplaces must contain the same plugin names");
-  }
-
-  const expectedNames = new Set(claudeEntries.keys());
-  const claudeDirectories = await directoryNames(join(root, "claude-plugins"));
-  const codexDirectories = await directoryNames(join(root, "plugins"));
-  if (!sameNames(expectedNames, claudeDirectories)) {
-    throw new Error("Claude plugin directories do not match marketplace entries");
-  }
-  if (!sameNames(expectedNames, codexDirectories)) {
-    throw new Error("Codex plugin directories do not match marketplace entries");
-  }
+  const marketplace = await readJson(join(root, ".claude-plugin", "marketplace.json"));
+  const entries = indexEntries(marketplace.plugins, "Claude marketplace");
 
   const plugins = new Map();
-  for (const name of expectedNames) {
-    const claudeEntry = claudeEntries.get(name);
-    const codexEntry = codexEntries.get(name);
-    if (claudeEntry.source !== `./claude-plugins/${name}`) {
-      throw new Error(`Unexpected Claude source for ${name}: ${stableJson(claudeEntry.source)}`);
-    }
-    if (
-      codexEntry.source?.source !== "local" ||
-      codexEntry.source?.path !== `./plugins/${name}`
-    ) {
-      throw new Error(`Unexpected Codex source for ${name}: ${stableJson(codexEntry.source)}`);
-    }
-
-    const claudeRoot = join(root, "claude-plugins", name);
-    const codexRoot = join(root, "plugins", name);
-    const claudeManifest = await readJson(join(claudeRoot, ".claude-plugin", "plugin.json"));
-    const codexManifest = await readJson(join(codexRoot, ".codex-plugin", "plugin.json"));
-    if (claudeManifest.name !== name || codexManifest.name !== name) {
+  for (const [name, entry] of entries) {
+    const pluginRoot = await resolvePluginRoot(root, name, entry.source);
+    const manifest = await readJson(join(pluginRoot, ".claude-plugin", "plugin.json"));
+    if (manifest.name !== name) {
       throw new Error(`Plugin manifest name mismatch for ${name}`);
     }
-    const versions = [claudeEntry.version, claudeManifest.version, codexManifest.version];
-    if (!versions.every((version) => version === versions[0])) {
-      throw new Error(`Claude entry and plugin manifests disagree on ${name} version`);
+    if (entry.version !== manifest.version) {
+      throw new Error(`Marketplace entry and plugin manifest disagree on ${name} version`);
     }
-    if (semver.valid(versions[0]) !== versions[0]) {
-      throw new Error(`Invalid strict semver for ${name}: ${versions[0]}`);
+    if (semver.valid(entry.version) !== entry.version) {
+      throw new Error(`Invalid strict semver for ${name}: ${entry.version}`);
     }
 
     const fingerprint = createHash("sha256")
-      .update(stableJson(claudeEntry))
+      .update(stableJson(entry))
       .update("\0")
-      .update(stableJson(codexEntry))
-      .update("\0")
-      .update(await digestTree(claudeRoot))
-      .update("\0")
-      .update(await digestTree(codexRoot))
+      .update(await digestTree(pluginRoot))
       .digest("hex");
-    plugins.set(name, { version: versions[0], fingerprint });
+    plugins.set(name, { version: entry.version, fingerprint });
   }
   return plugins;
 }

@@ -7,10 +7,6 @@ description: Read-only requirement and codebase exploration before planning. Use
 
 Clarify the requirement — for a change its consumer can perceive, the product behaviour first — explore the relevant code, and when the user proposes a change, converge on a design direction before planning. Do not implement, do not write plans, and do not modify files. The output is a concise understanding and, when applicable, an approved direction that the user or `dev-write-plan` can use.
 
-<!-- codex -->
-<!-- include codex-request-user-input -->
-<!-- /codex -->
-
 ## Rules
 
 1. Do not edit files, create files, format code, commit, install dependencies, or run commands that mutate the workspace.
@@ -68,21 +64,14 @@ Read enough to understand the relevant terrain:
 If the user has a proposed change, grill the technical decisions until the direction holds up — but settle only the decisions worth settling before code is written. Design to the depth the risk demands and no deeper: a decision belongs here when reversing it later would be expensive, or when a competent implementer working from the live code and conventions could reasonably choose differently and the difference matters. Everything else is the executor's call, and the direction says so explicitly. Resolve dependencies between the decisions you do settle one by one, and give each question your recommended answer. For a perceptible change, the product conclusions confirmed in step 2 are settled input: grill the technical decisions only.
 
 Ask the questions one at a time, waiting for feedback on each question before continuing. Asking multiple questions at once is bewildering. If a question can be answered by exploring the codebase, explore the codebase instead.
-<!-- claude -->
 
 Between the codebase and the user sits a third rung. When the code and conventions do not settle a technical decision and you have no recommendation you are confident in, consult the advisor through the `dev-advisor` skill before putting the question to the user — the same holds for the decisions of step 5, which are these decisions. Consulting the advisor is not a question to the user, so the opt-out below does not suppress it.
 
 If the answer settles the point — a technical fact, or the single sane path — do not ask: relay in a line or two what the advisor settled, and let the direction and the report cite its answer as evidence the way they cite `file:line`. If a genuine trade-off survives it — a preference, a cost only the user can weigh — ask as you would have, carrying the advisor's view in your recommended answer. If the advisor cannot be dispatched, or its answer leaves the point open, the question goes to the user unchanged.
-<!-- /claude -->
 
 Opt-out: if the user says "don't grill me" or asks to keep it quick, ask only for decisions that cannot be inferred safely and derive the rest from code and conventions. The opt-out holds for the rest of the session unless the user asks to be grilled again.
 
-<!-- codex -->
-Prefer `request_user_input` with concrete options and a recommended default; use plain chat only for genuinely open-ended questions that the structured tool cannot represent.
-<!-- /codex -->
-<!-- claude -->
 Prefer the environment's structured user-question tool (`AskUserQuestion`, `request_user_input`, or an equivalent) with concrete options and a recommended default; fall back to plain chat for open-ended questions or when no such tool exists.
-<!-- /claude -->
 
 Grilling adapted from [mattpocock/skills](https://github.com/mattpocock/skills/blob/main/skills/productivity/grilling/SKILL.md).
 

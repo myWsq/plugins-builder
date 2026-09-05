@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { cp, lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -10,12 +10,13 @@ import {
   build,
   defaultProjectRoot,
   expandSkillFragments,
-  renderTargetMarkdown,
   validatePluginDescriptor
 } from "../src/build.mjs";
 import { checkRelease } from "../src/check-release.mjs";
 import { validateReleaseTag } from "../src/check-tag.mjs";
 import { syncRelease } from "../src/sync-release.mjs";
+
+const RETIRED_MARKER_PATTERN = /<!--[\t ]*\/?(?:claude|codex)[\t ]*-->/;
 
 async function snapshotTree(root) {
   const snapshot = {};
@@ -82,28 +83,45 @@ async function writeHooksFixture(projectRoot, plugin) {
   return hooksRoot;
 }
 
-async function assertRenderedSkillTree(sourceRoot, generatedRoot, target, fragments = new Map()) {
+async function loadFragmentFixture(plugin) {
+  const fragmentsRoot = join(defaultProjectRoot, "plugins", plugin, "fragments");
+  const fragments = new Map();
+  for (const file of await readdir(fragmentsRoot)) {
+    fragments.set(file.replace(/\.md$/, ""), await readFile(join(fragmentsRoot, file), "utf8"));
+  }
+  return fragments;
+}
+
+async function assertRenderedSkillTree(sourceRoot, generatedRoot, fragments = new Map()) {
   const sourceTree = await snapshotTree(sourceRoot);
   const generatedTree = await snapshotTree(generatedRoot);
   assert.deepEqual(Object.keys(generatedTree), Object.keys(sourceTree));
 
   for (const [path, sourceMetadata] of Object.entries(sourceTree)) {
-    assert.equal(generatedTree[path].mode, sourceMetadata.mode, `${target} mode for ${path}`);
+    assert.equal(generatedTree[path].mode, sourceMetadata.mode, `mode for ${path}`);
     if (path.toLowerCase().endsWith(".md")) {
       const source = await readFile(join(sourceRoot, path), "utf8");
-      const targeted = renderTargetMarkdown(source, target, join(sourceRoot, path));
       assert.equal(
         await readFile(join(generatedRoot, path), "utf8"),
-        expandSkillFragments(targeted, fragments, join(sourceRoot, path)),
-        `${target} content for ${path}`
+        expandSkillFragments(source, fragments, join(sourceRoot, path)),
+        `content for ${path}`
       );
     } else {
-      assert.equal(generatedTree[path].hash, sourceMetadata.hash, `${target} hash for ${path}`);
+      assert.equal(generatedTree[path].hash, sourceMetadata.hash, `hash for ${path}`);
     }
   }
 }
 
-test("build emits deterministic Claude and Codex marketplaces", async (t) => {
+async function bumpPluginVersion(root, name, version) {
+  await updateJson(join(root, ".claude-plugin", "marketplace.json"), (marketplace) => {
+    marketplace.plugins.find((entry) => entry.name === name).version = version;
+  });
+  await updateJson(join(root, "plugins", name, ".claude-plugin", "plugin.json"), (manifest) => {
+    manifest.version = version;
+  });
+}
+
+test("build emits a deterministic Claude Code marketplace", async (t) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-test-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
   const first = join(temporaryRoot, "first");
@@ -113,136 +131,100 @@ test("build emits deterministic Claude and Codex marketplaces", async (t) => {
   await build({ outDir: second, sourceRevision: "test-revision" });
 
   assert.deepEqual(await snapshotTree(first), await snapshotTree(second));
-  const claudeMarketplace = JSON.parse(
+  const marketplace = JSON.parse(
     await readFile(join(first, ".claude-plugin", "marketplace.json"), "utf8")
   );
-  const codexMarketplace = JSON.parse(
-    await readFile(join(first, ".agents", "plugins", "marketplace.json"), "utf8")
-  );
-  assert.equal(claudeMarketplace.plugins[0].source, "./claude-plugins/dev");
   const devDescriptor = JSON.parse(
     await readFile(join(defaultProjectRoot, "catalog", "plugins", "dev.json"), "utf8")
   );
-  assert.equal(claudeMarketplace.plugins[0].version, devDescriptor.version);
-  assert.equal(codexMarketplace.plugins[0].source.path, "./plugins/dev");
+  assert.deepEqual(Object.keys(marketplace), ["name", "owner", "metadata", "plugins"]);
+  assert.equal(marketplace.plugins[0].name, "dev");
+  assert.equal(marketplace.plugins[0].source, "./plugins/dev");
+  assert.equal(marketplace.plugins[0].version, devDescriptor.version);
+  assert.equal(marketplace.plugins[0].category, devDescriptor.category);
+  for (const entry of marketplace.plugins) {
+    assert.match(entry.source, /^\.\/plugins\/[a-z0-9-]+$/, `${entry.name} source`);
+    assert.deepEqual(
+      Object.keys(entry),
+      ["name", "source", "version", "description", "author", "category", "homepage"],
+      `${entry.name} entry shape`
+    );
+  }
+
+  const devManifest = JSON.parse(
+    await readFile(join(first, "plugins", "dev", ".claude-plugin", "plugin.json"), "utf8")
+  );
+  assert.deepEqual(Object.keys(devManifest), [
+    "name",
+    "version",
+    "description",
+    "author",
+    "homepage",
+    "repository",
+    "license",
+    "keywords"
+  ]);
+  assert.equal(devManifest.version, devDescriptor.version);
 
   const sourceSkills = join(defaultProjectRoot, "plugins", "dev", "skills");
-  const fragments = new Map([
-    [
-      "codex-request-user-input",
-      await readFile(
-        join(defaultProjectRoot, "plugins", "dev", "fragments", "codex-request-user-input.md"),
-        "utf8"
-      )
-    ]
-  ]);
-  await assertRenderedSkillTree(
-    sourceSkills,
-    join(first, "claude-plugins", "dev", "skills"),
-    "claude",
-    fragments
-  );
-  await assertRenderedSkillTree(
-    sourceSkills,
-    join(first, "plugins", "dev", "skills"),
-    "codex",
-    fragments
-  );
-
-  for (const skill of ["dev-explore", "dev-write-plan", "dev-execute-plan"]) {
-    const sourceSkill = await readFile(join(sourceSkills, skill, "SKILL.md"), "utf8");
-    const claudeSkill = await readFile(
-      join(first, "claude-plugins", "dev", "skills", skill, "SKILL.md"),
-      "utf8"
-    );
-    const codexSkill = await readFile(
-      join(first, "plugins", "dev", "skills", skill, "SKILL.md"),
-      "utf8"
-    );
-    assert.match(sourceSkill, /<!-- include codex-request-user-input -->/);
-    assert.doesNotMatch(sourceSkill, /default_mode_request_user_input/);
-    assert.doesNotMatch(claudeSkill, /default_mode_request_user_input/);
-    assert.match(codexSkill, /request_user_input/);
-    assert.match(codexSkill, /codex features enable default_mode_request_user_input/);
-    assert.doesNotMatch(claudeSkill, /<!-- \/?(?:codex|claude) -->/);
-    assert.doesNotMatch(codexSkill, /<!-- \/?(?:codex|claude) -->/);
-    assert.doesNotMatch(codexSkill, /<!-- include /);
+  await assertRenderedSkillTree(sourceSkills, join(first, "plugins", "dev", "skills"));
+  for (const skill of ["dev-explore", "dev-write-plan", "dev-execute-plan", "dev-advisor"]) {
+    const rendered = await readFile(join(first, "plugins", "dev", "skills", skill, "SKILL.md"), "utf8");
+    assert.doesNotMatch(rendered, RETIRED_MARKER_PATTERN, `${skill} markers`);
+    assert.doesNotMatch(rendered, /<!--[\t ]*include\b/, `${skill} includes`);
+    assert.doesNotMatch(rendered, /default_mode_request_user_input/, `${skill} foreign prerequisite`);
   }
-  await assert.rejects(lstat(join(first, "claude-plugins", "dev", "fragments")), { code: "ENOENT" });
   await assert.rejects(lstat(join(first, "plugins", "dev", "fragments")), { code: "ENOENT" });
 
   assert.deepEqual(
     await snapshotTree(join(first, "docs")),
     await snapshotTree(join(defaultProjectRoot, "docs"))
   );
-  const canonicalDocs = await readFile(join(defaultProjectRoot, "docs", "dev.md"), "utf8");
-  assert.equal(await readFile(join(first, "docs", "dev.md"), "utf8"), canonicalDocs);
   const generatedReadme = await readFile(join(first, "README.md"), "utf8");
   assert.equal(generatedReadme, await readFile(join(defaultProjectRoot, "MARKET_README.md"), "utf8"));
-  assert.match(generatedReadme, /codex features enable default_mode_request_user_input/);
-  await assert.rejects(readFile(join(first, "claude-plugins", "dev", "README.md")), {
-    code: "ENOENT"
-  });
-  await assert.rejects(readFile(join(first, "plugins", "dev", "README.md")), {
-    code: "ENOENT"
-  });
-  const codexManifest = JSON.parse(
-    await readFile(join(first, "plugins", "dev", ".codex-plugin", "plugin.json"), "utf8")
-  );
-  assert.equal(codexManifest.skills, "./skills/");
-  await assert.rejects(lstat(join(first, "claude-plugins", "dev", ".mcp.json")), { code: "ENOENT" });
-  await assert.rejects(lstat(join(first, "plugins", "dev", ".mcp.json")), { code: "ENOENT" });
+  await assert.rejects(readFile(join(first, "plugins", "dev", "README.md")), { code: "ENOENT" });
+
+  for (const retired of [
+    ".agents",
+    "claude-plugins",
+    join("plugins", "dev", ".codex-plugin"),
+    join("plugins", "dev", ".mcp.json")
+  ]) {
+    await assert.rejects(lstat(join(first, retired)), { code: "ENOENT" }, retired);
+  }
 });
 
-test("build emits the commit plugin with fragment-expanded skills in both bundles", async (t) => {
+test("build emits the commit plugin with fragment-expanded skills", async (t) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-commit-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
   const outDir = join(temporaryRoot, "dist");
   await build({ outDir, sourceRevision: "test-revision" });
 
-  const claudeMarketplace = JSON.parse(
+  const marketplace = JSON.parse(
     await readFile(join(outDir, ".claude-plugin", "marketplace.json"), "utf8")
   );
-  const codexMarketplace = JSON.parse(
-    await readFile(join(outDir, ".agents", "plugins", "marketplace.json"), "utf8")
-  );
-  assert.ok(claudeMarketplace.plugins.some((entry) => entry.name === "commit"));
-  assert.ok(codexMarketplace.plugins.some((entry) => entry.name === "commit"));
+  assert.ok(marketplace.plugins.some((entry) => entry.name === "commit"));
 
-  const claudeSkill = await readFile(
-    join(outDir, "claude-plugins", "commit", "skills", "commit", "SKILL.md"),
-    "utf8"
+  const fragments = await loadFragmentFixture("commit");
+  assert.ok(fragments.has("commit-flow"), "the commit plugin still ships the shared commit flow");
+  await assertRenderedSkillTree(
+    join(defaultProjectRoot, "plugins", "commit", "skills"),
+    join(outDir, "plugins", "commit", "skills"),
+    fragments
   );
-  const codexSkill = await readFile(
-    join(outDir, "plugins", "commit", "skills", "commit", "SKILL.md"),
-    "utf8"
-  );
-  assert.equal(claudeSkill, codexSkill);
-  assert.doesNotMatch(claudeSkill, /<!-- \/?(?:codex|claude) -->/);
-  assert.doesNotMatch(codexSkill, /<!-- \/?(?:codex|claude) -->/);
 
   for (const skill of ["commit", "commit-push", "commit-pr", "commit-clean"]) {
-    for (const bundle of [join("claude-plugins", "commit"), join("plugins", "commit")]) {
-      const rendered = await readFile(join(outDir, bundle, "skills", skill, "SKILL.md"), "utf8");
-      assert.doesNotMatch(rendered, /<!--[\t ]*include\b/);
-    }
+    const rendered = await readFile(join(outDir, "plugins", "commit", "skills", skill, "SKILL.md"), "utf8");
+    assert.doesNotMatch(rendered, /<!--[\t ]*include\b/, `${skill} includes`);
   }
-  const claudePushPr = await readFile(
-    join(outDir, "claude-plugins", "commit", "skills", "commit-pr", "SKILL.md"),
-    "utf8"
-  );
-  assert.match(claudeSkill, /mirrors the host's standard commit workflow/);
-  assert.match(claudePushPr, /mirrors the host's standard commit workflow/);
-  await assert.rejects(lstat(join(outDir, "claude-plugins", "commit", "fragments")), {
-    code: "ENOENT"
-  });
-
-  await assert.rejects(lstat(join(outDir, "claude-plugins", "commit", ".mcp.json")), {
-    code: "ENOENT"
-  });
+  for (const skill of ["commit", "commit-push", "commit-pr"]) {
+    const rendered = await readFile(join(outDir, "plugins", "commit", "skills", skill, "SKILL.md"), "utf8");
+    assert.match(rendered, /mirrors the host's standard commit workflow/, `${skill} expands commit-flow`);
+  }
+  await assert.rejects(lstat(join(outDir, "plugins", "commit", "fragments")), { code: "ENOENT" });
 });
 
-test("build ships plugin hooks to the Claude bundle only", async (t) => {
+test("build ships plugin hooks into the bundle", async (t) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-hooks-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
   const projectRoot = await copyProjectFixture(temporaryRoot);
@@ -251,28 +233,23 @@ test("build ships plugin hooks to the Claude bundle only", async (t) => {
   await build({ projectRoot, outDir, sourceRevision: "test-revision" });
 
   assert.deepEqual(
-    await snapshotTree(join(outDir, "claude-plugins", "dev", "hooks")),
+    await snapshotTree(join(outDir, "plugins", "dev", "hooks")),
     await snapshotTree(hooksRoot)
   );
-  await assert.rejects(lstat(join(outDir, "plugins", "dev", "hooks")), {
-    code: "ENOENT"
-  });
+  await assert.rejects(lstat(join(outDir, "plugins", "commit", "hooks")), { code: "ENOENT" });
 });
 
-test("build ships plugin agents to the Claude bundle only", async (t) => {
+test("build ships plugin agents into the bundle", async (t) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-agents-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
   const outDir = join(temporaryRoot, "dist");
   await build({ outDir, sourceRevision: "test-revision" });
 
-  const sourceAgents = await snapshotTree(join(defaultProjectRoot, "plugins", "dev", "agents"));
   assert.deepEqual(
-    await snapshotTree(join(outDir, "claude-plugins", "dev", "agents")),
-    sourceAgents
+    await snapshotTree(join(outDir, "plugins", "dev", "agents")),
+    await snapshotTree(join(defaultProjectRoot, "plugins", "dev", "agents"))
   );
-  await assert.rejects(lstat(join(outDir, "plugins", "dev", "agents")), {
-    code: "ENOENT"
-  });
+  await assert.rejects(lstat(join(outDir, "plugins", "commit", "agents")), { code: "ENOENT" });
 });
 
 test("build rejects a plugin hooks directory without valid hooks.json", async (t) => {
@@ -294,71 +271,34 @@ test("build rejects a plugin hooks directory without valid hooks.json", async (t
   );
 });
 
-test("build renders target blocks in skill Markdown without renaming source files", async (t) => {
-  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-target-skill-"));
+test("build rejects retired target markers in skill Markdown and copies other files verbatim", async (t) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-retired-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
   const projectRoot = await copyProjectFixture(temporaryRoot);
   const skillRoot = join(projectRoot, "plugins", "dev", "skills", "dev-explore");
-  const source = [
-    "# Shared\n",
-    "<!-- codex -->\n",
-    "Codex only.\n",
-    "<!-- /codex -->\n",
-    "<!-- claude -->\n",
-    "Claude only.\n",
-    "<!-- /claude -->\n"
-  ].join("");
-  await writeFile(join(skillRoot, "SKILL.md"), source);
-  await mkdir(join(skillRoot, "references"), { recursive: true });
-  await writeFile(
-    join(skillRoot, "references", "platform.md"),
-    "Shared reference.\n<!-- codex -->\nCodex reference.\n<!-- /codex -->\n"
-  );
-  await writeFile(join(skillRoot, "directive.txt"), source);
+  const marked = "# Shared\n<!-- codex -->\nOne target only.\n<!-- /codex -->\n";
 
+  await writeFile(join(skillRoot, "directive.txt"), marked);
   const outDir = join(temporaryRoot, "dist");
   await build({ projectRoot, outDir, sourceRevision: "test-revision" });
-
-  const claudeSkillRoot = join(outDir, "claude-plugins", "dev", "skills", "dev-explore");
-  const codexSkillRoot = join(outDir, "plugins", "dev", "skills", "dev-explore");
-  assert.equal(await readFile(join(claudeSkillRoot, "SKILL.md"), "utf8"), "# Shared\nClaude only.\n");
-  assert.equal(await readFile(join(codexSkillRoot, "SKILL.md"), "utf8"), "# Shared\nCodex only.\n");
   assert.equal(
-    await readFile(join(claudeSkillRoot, "references", "platform.md"), "utf8"),
-    "Shared reference.\n"
+    await readFile(join(outDir, "plugins", "dev", "skills", "dev-explore", "directive.txt"), "utf8"),
+    marked
   );
-  assert.equal(
-    await readFile(join(codexSkillRoot, "references", "platform.md"), "utf8"),
-    "Shared reference.\nCodex reference.\n"
-  );
-  assert.equal(await readFile(join(claudeSkillRoot, "directive.txt"), "utf8"), source);
-  assert.equal(await readFile(join(codexSkillRoot, "directive.txt"), "utf8"), source);
-});
 
-test("target block rendering rejects malformed known directives", () => {
-  const sourcePath = "plugins/example/skills/example/SKILL.md";
-  const invalidSources = [
-    ["orphan close", "<!-- /codex -->\n", /closing codex without an open block/],
-    [
-      "mismatched close",
-      "<!-- codex -->\ntext\n<!-- /claude -->\n",
-      /closing claude while codex is open/
-    ],
-    [
-      "nested block",
-      "<!-- codex -->\n<!-- claude -->\n<!-- /claude -->\n<!-- /codex -->\n",
-      /nested claude block inside codex/
-    ],
-    ["unclosed block", "<!-- claude -->\ntext\n", /unclosed claude block/],
-    ["inline marker", "text <!-- codex -->\n", /directives must occupy their own line/]
-  ];
-
-  for (const [name, source, message] of invalidSources) {
-    assert.throws(
-      () => renderTargetMarkdown(source, "codex", sourcePath),
+  await mkdir(join(skillRoot, "references"), { recursive: true });
+  const reference = join(skillRoot, "references", "platform.md");
+  for (const [name, text] of [
+    ["opening block", marked],
+    ["stray close", "Shared.\n<!-- /claude -->\n"],
+    ["padded inline marker", "Shared <!--\tclaude -->\n"]
+  ]) {
+    await writeFile(reference, text);
+    await assert.rejects(
+      build({ projectRoot, outDir: join(temporaryRoot, "rejected") }),
       (error) => {
-        assert.match(error.message, message, name);
-        assert.match(error.message, new RegExp(sourcePath.replaceAll("/", "\\/")), name);
+        assert.match(error.message, /Retired target directive in /, name);
+        assert.match(error.message, /dev-explore[\\/]references[\\/]platform\.md/, name);
         return true;
       }
     );
@@ -385,15 +325,18 @@ test("build rejects directives inside skill fragments", async (t) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-fragment-source-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
   const projectRoot = await copyProjectFixture(temporaryRoot);
-  await writeFile(
-    join(projectRoot, "plugins", "dev", "fragments", "codex-request-user-input.md"),
-    "<!-- include another-fragment -->\n"
-  );
+  const fragment = join(projectRoot, "plugins", "commit", "fragments", "commit-flow.md");
 
-  await assert.rejects(
-    build({ projectRoot, outDir: join(temporaryRoot, "dist") }),
-    /Skill fragment must not contain target or include directives/
-  );
+  for (const text of [
+    "<!-- include another-fragment -->\n",
+    "Shared.\n<!-- claude -->\nOnly here.\n<!-- /claude -->\n"
+  ]) {
+    await writeFile(fragment, text);
+    await assert.rejects(
+      build({ projectRoot, outDir: join(temporaryRoot, "dist") }),
+      /Skill fragment must not contain target or include directives/
+    );
+  }
 });
 
 test("build removes stale generated files", async (t) => {
@@ -454,6 +397,17 @@ test("descriptor validation rejects invalid semver", () => {
   );
 });
 
+test("descriptor validation requires a top-level category", async () => {
+  const descriptor = JSON.parse(
+    await readFile(join(defaultProjectRoot, "catalog", "plugins", "dev.json"), "utf8")
+  );
+  validatePluginDescriptor(descriptor);
+
+  const { category, ...legacy } = descriptor;
+  legacy.targets = { claude: { category } };
+  assert.throws(() => validatePluginDescriptor(legacy), /dev\.category must be a non-empty string/);
+});
+
 test("portable source validation rejects symlinks", async (t) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-link-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
@@ -488,44 +442,82 @@ test("release gate requires a plugin version bump for payload changes", async (t
     /payload changed without a version bump/
   );
 
-  await updateJson(
-    join(nextDir, ".claude-plugin", "marketplace.json"),
-    (marketplace) => {
-      marketplace.plugins[0].version = "999.0.0";
-    }
-  );
-  await updateJson(
-    join(nextDir, "claude-plugins", "dev", ".claude-plugin", "plugin.json"),
-    (manifest) => {
-      manifest.version = "999.0.0";
-    }
-  );
-  await updateJson(
-    join(nextDir, "plugins", "dev", ".codex-plugin", "plugin.json"),
-    (manifest) => {
-      manifest.version = "999.0.0";
-    }
-  );
+  await bumpPluginVersion(nextDir, "dev", "999.0.0");
   await checkRelease({ currentDir, nextDir });
 });
 
-test("release gate treats marketplace policy as versioned plugin payload", async (t) => {
-  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-policy-"));
+test("release gate treats the marketplace entry as versioned plugin payload", async (t) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-entry-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
   const currentDir = join(temporaryRoot, "current");
   const nextDir = join(temporaryRoot, "next");
   await build({ outDir: currentDir, sourceRevision: "current" });
   await build({ outDir: nextDir, sourceRevision: "next" });
   await updateJson(
-    join(nextDir, ".agents", "plugins", "marketplace.json"),
+    join(nextDir, ".claude-plugin", "marketplace.json"),
     (marketplace) => {
-      marketplace.plugins[0].policy.authentication = "ON_USE";
+      marketplace.plugins[0].category = "productivity";
     }
   );
   await assert.rejects(
     checkRelease({ currentDir, nextDir }),
     /payload changed without a version bump/
   );
+});
+
+test("release gate resolves plugin roots from marketplace sources across a layout move", async (t) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-layout-"));
+  t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const currentDir = join(temporaryRoot, "current");
+  const nextDir = join(temporaryRoot, "next");
+  await build({ outDir: currentDir, sourceRevision: "current" });
+  await build({ outDir: nextDir, sourceRevision: "next" });
+
+  // Reshape `current` like the last dual-target snapshot: bundles under claude-plugins/, a second
+  // index under .agents/, and plugins/<name>/ holding only a foreign manifest. A gate that guessed
+  // the layout instead of following each entry's source would read the wrong tree here.
+  await rename(join(currentDir, "plugins"), join(currentDir, "claude-plugins"));
+  const currentIndex = join(currentDir, ".claude-plugin", "marketplace.json");
+  const names = JSON.parse(await readFile(currentIndex, "utf8")).plugins.map((entry) => entry.name);
+  await updateJson(currentIndex, (marketplace) => {
+    for (const entry of marketplace.plugins) entry.source = `./claude-plugins/${entry.name}`;
+  });
+  await mkdir(join(currentDir, ".agents", "plugins"), { recursive: true });
+  await writeFile(
+    join(currentDir, ".agents", "plugins", "marketplace.json"),
+    `${JSON.stringify({ name: "plugins", plugins: [] })}\n`
+  );
+  for (const name of names) {
+    await mkdir(join(currentDir, "plugins", name, ".codex-plugin"), { recursive: true });
+    await writeFile(
+      join(currentDir, "plugins", name, ".codex-plugin", "plugin.json"),
+      `${JSON.stringify({ name, version: "0.0.0" })}\n`
+    );
+  }
+
+  // The moved source is part of every entry, so an unchanged version is rejected...
+  await assert.rejects(
+    checkRelease({ currentDir, nextDir }),
+    /payload changed without a version bump/
+  );
+  // ...and a bump on every plugin lets the same gate read both layouts.
+  for (const name of names) await bumpPluginVersion(nextDir, name, "999.0.0");
+  const result = await checkRelease({ currentDir, nextDir });
+  assert.equal(result.pluginCount, names.length);
+
+  const nextIndex = join(nextDir, ".claude-plugin", "marketplace.json");
+  for (const [source, message] of [
+    ["../outside", /must stay inside the marketplace root/],
+    ["./", /must stay inside the marketplace root/],
+    ["/tmp/outside", /must declare a relative source path/],
+    [{ source: "local", path: "./plugins/dev" }, /must declare a relative source path/],
+    ["./plugins/missing", /is not a directory in the marketplace/]
+  ]) {
+    await updateJson(nextIndex, (marketplace) => {
+      marketplace.plugins[0].source = source;
+    });
+    await assert.rejects(checkRelease({ currentDir, nextDir }), message, JSON.stringify(source));
+  }
 });
 
 test("release gate blocks plugin removal unless declared in catalog.removed", async (t) => {
