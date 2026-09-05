@@ -70,3 +70,20 @@ The target repository is written with a dedicated SSH deploy key. Its public key
 deploy key on `myWsq/plugins`; its private key is stored in the builder's
 `MARKETPLACE_REPO_SSH_KEY` Actions secret. See [AGENTS.md](AGENTS.md) for the full source, version,
 bootstrap, and failure-handling contract.
+
+## External plugin sources
+
+Plugins may also remain in their owning Git repositories. Register a credential-free repository
+URL, plugin subdirectory and immutable commit SHA in an external catalog descriptor. The builder
+collects the ready-to-install native plugin directory without running upstream build scripts;
+metadata and version come from its original `plugin.json`. Public and private sources are supported.
+See [external plugin delivery and authentication](docs/external-plugins.md) for the contract,
+GitHub App configuration, update procedure and validation boundaries.
+
+## Skill names
+
+Plugin skills use Claude Code's `/plugin-name:skill-name` namespace. Keep the skill directory and
+frontmatter `name` free of a redundant plugin prefix: `dev/skills/explore/` declares `name: explore`
+and is invoked as `/dev:explore`. Use qualified names when referring to skills across instructions.
+Existing prefixed skill names have been replaced; update any saved prompts or project references
+(for example `/dev:dev-explore` becomes `/dev:explore`). There are no duplicate compatibility skills.

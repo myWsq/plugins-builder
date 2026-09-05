@@ -168,7 +168,7 @@ test("build emits a deterministic Claude Code marketplace", async (t) => {
 
   const sourceSkills = join(defaultProjectRoot, "plugins", "dev", "skills");
   await assertRenderedSkillTree(sourceSkills, join(first, "plugins", "dev", "skills"));
-  for (const skill of ["dev-explore", "dev-write-plan", "dev-execute-plan", "dev-advisor"]) {
+  for (const skill of ["explore", "write-plan", "execute-plan", "advisor"]) {
     const rendered = await readFile(join(first, "plugins", "dev", "skills", skill, "SKILL.md"), "utf8");
     assert.doesNotMatch(rendered, RETIRED_MARKER_PATTERN, `${skill} markers`);
     assert.doesNotMatch(rendered, /<!--[\t ]*include\b/, `${skill} includes`);
@@ -213,11 +213,11 @@ test("build emits the commit plugin with fragment-expanded skills", async (t) =>
     fragments
   );
 
-  for (const skill of ["commit", "commit-push", "commit-pr", "commit-clean"]) {
+  for (const skill of ["commit", "push", "pr", "clean"]) {
     const rendered = await readFile(join(outDir, "plugins", "commit", "skills", skill, "SKILL.md"), "utf8");
     assert.doesNotMatch(rendered, /<!--[\t ]*include\b/, `${skill} includes`);
   }
-  for (const skill of ["commit", "commit-push", "commit-pr"]) {
+  for (const skill of ["commit", "push", "pr"]) {
     const rendered = await readFile(join(outDir, "plugins", "commit", "skills", skill, "SKILL.md"), "utf8");
     assert.match(rendered, /mirrors the host's standard commit workflow/, `${skill} expands commit-flow`);
   }
@@ -275,14 +275,14 @@ test("build rejects retired target markers in skill Markdown and copies other fi
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-retired-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
   const projectRoot = await copyProjectFixture(temporaryRoot);
-  const skillRoot = join(projectRoot, "plugins", "dev", "skills", "dev-explore");
+  const skillRoot = join(projectRoot, "plugins", "dev", "skills", "explore");
   const marked = "# Shared\n<!-- codex -->\nOne target only.\n<!-- /codex -->\n";
 
   await writeFile(join(skillRoot, "directive.txt"), marked);
   const outDir = join(temporaryRoot, "dist");
   await build({ projectRoot, outDir, sourceRevision: "test-revision" });
   assert.equal(
-    await readFile(join(outDir, "plugins", "dev", "skills", "dev-explore", "directive.txt"), "utf8"),
+    await readFile(join(outDir, "plugins", "dev", "skills", "explore", "directive.txt"), "utf8"),
     marked
   );
 
@@ -298,7 +298,7 @@ test("build rejects retired target markers in skill Markdown and copies other fi
       build({ projectRoot, outDir: join(temporaryRoot, "rejected") }),
       (error) => {
         assert.match(error.message, /Retired target directive in /, name);
-        assert.match(error.message, /dev-explore[\\/]references[\\/]platform\.md/, name);
+        assert.match(error.message, /explore[\\/]references[\\/]platform\.md/, name);
         return true;
       }
     );

@@ -218,3 +218,18 @@ Every target file outside `.git/` must be generated here.
 - Release-gate tests cover any new component or policy behavior.
 - No credentials, symlinks, stale files, or machine-specific absolute paths enter the output.
 - Official publication happens from an immutable, correctly versioned tag.
+
+## External plugin sources
+
+Descriptors containing `origin` use the external-source contract in `docs/external-plugins.md`.
+They contain only `name`, `category`, and `origin` (repository, path, optional ref label, mandatory
+full commit SHA). These plugins are maintained upstream; this repository owns their selection
+and pinned release. Their manifest is authoritative for metadata and installed version. The
+local-source requirements above remain applicable to descriptors without `origin`.
+
+External plugins are collected as complete, already-built native Claude Code directories, including
+commands, MCP/LSP configuration, auxiliary resources and their own LICENSE. They do not use this
+builder's fragment compiler. Never run upstream build scripts during collection, follow mutable
+refs, or duplicate upstream metadata in the catalog. Changes to their payload or marketplace entry
+still require a strictly greater upstream plugin version. Keep source read credentials separate
+from the marketplace publishing credential. Do not expose private source credentials to fork PRs.

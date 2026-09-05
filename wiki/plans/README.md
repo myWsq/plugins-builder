@@ -14,3 +14,4 @@ Plans are named `YYYYMMDD-short-slug`. The numbered entries (003–009) predate 
 | [20260903-explore-product-clarify](20260903-explore-product-clarify.md) | DONE | self | none |
 | [20260904-explore-advisor-escalation](20260904-explore-advisor-escalation.md) | DONE | subagent (opus) | none |
 | [20260905-drop-codex-target](20260905-drop-codex-target.md) | DONE | self | none |
+| [20260905-execute-work-packages](20260905-execute-work-packages.md) | DONE | self | none |

@@ -2,6 +2,7 @@ import { cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } f
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import semver from "semver";
+import { fetchExternalPlugin, validateExternalBundle, validateExternalDescriptor } from "./external-plugin.mjs";
 
 const modulePath = fileURLToPath(import.meta.url);
 export const defaultProjectRoot = resolve(dirname(modulePath), "..");
@@ -236,42 +237,58 @@ export async function build({
   invariant(await pathExists(marketReadme), "MARKET_README.md is required");
   await assertPortableTree(docsRoot);
   const plugins = [];
-  for (const name of catalog.plugins) {
-    invariant(typeof name === "string" && NAME_PATTERN.test(name), `Invalid catalog plugin name: ${name}`);
-    const plugin = await readJson(join(projectRoot, "catalog", "plugins", `${name}.json`));
-    validatePluginDescriptor(plugin, name);
-    const sourceRoot = join(projectRoot, "plugins", name);
-    await assertPortableTree(sourceRoot);
-    invariant(await pathExists(join(sourceRoot, "skills")), `Plugin ${name} must contain skills/`);
-    if (await pathExists(join(sourceRoot, "hooks"))) {
-      await readJson(join(sourceRoot, "hooks", "hooks.json"));
-    }
-    plugins.push(plugin);
-  }
-
   await mkdir(dirname(outDir), { recursive: true });
   const temporaryDirectory = await mkdtemp(join(dirname(outDir), ".plugins-build-"));
   const temporaryRoot = join(temporaryDirectory, "root");
-
+  const externalRoots = new Map();
   try {
+    for (const name of catalog.plugins) {
+      invariant(typeof name === "string" && NAME_PATTERN.test(name), `Invalid catalog plugin name: ${name}`);
+      const plugin = await readJson(join(projectRoot, "catalog", "plugins", `${name}.json`));
+      if (plugin.origin !== undefined) {
+        invariant(plugin.name === name, "External descriptor name must match catalog name");
+        validateExternalDescriptor(plugin);
+        const externalRoot = join(temporaryDirectory, "sources", name);
+        await fetchExternalPlugin(plugin, externalRoot);
+        await assertPortableTree(externalRoot);
+        const manifest = await validateExternalBundle(externalRoot, name);
+        const resolved = { ...manifest, category: plugin.category };
+        validatePluginDescriptor(resolved, name);
+        externalRoots.set(name, externalRoot);
+        plugins.push(resolved);
+        continue;
+      }
+      validatePluginDescriptor(plugin, name);
+      const sourceRoot = join(projectRoot, "plugins", name);
+      await assertPortableTree(sourceRoot);
+      invariant(await pathExists(join(sourceRoot, "skills")), `Plugin ${name} must contain skills/`);
+      if (await pathExists(join(sourceRoot, "hooks"))) {
+        await readJson(join(sourceRoot, "hooks", "hooks.json"));
+      }
+      plugins.push(plugin);
+    }
+
     await mkdir(temporaryRoot, { recursive: true });
     const entries = [];
 
     for (const plugin of plugins) {
       const sourceRoot = join(projectRoot, "plugins", plugin.name);
       const bundleRoot = join(temporaryRoot, "plugins", plugin.name);
-      const skillFragments = await loadSkillFragments(sourceRoot);
+      if (externalRoots.has(plugin.name)) {
+        await cp(externalRoots.get(plugin.name), bundleRoot, { recursive: true });
+      } else {
+        const skillFragments = await loadSkillFragments(sourceRoot);
 
-      await mkdir(join(bundleRoot, ".claude-plugin"), { recursive: true });
-      await renderSkillTree(join(sourceRoot, "skills"), join(bundleRoot, "skills"), skillFragments);
-      for (const component of ["hooks", "agents"]) {
-        if (await pathExists(join(sourceRoot, component))) {
-          await cp(join(sourceRoot, component), join(bundleRoot, component), { recursive: true });
+        await mkdir(join(bundleRoot, ".claude-plugin"), { recursive: true });
+        await renderSkillTree(join(sourceRoot, "skills"), join(bundleRoot, "skills"), skillFragments);
+        for (const component of ["hooks", "agents"]) {
+          if (await pathExists(join(sourceRoot, component))) {
+            await cp(join(sourceRoot, component), join(bundleRoot, component), { recursive: true });
+          }
         }
+        await cp(join(projectRoot, "LICENSE"), join(bundleRoot, "LICENSE"));
+        await writeJson(join(bundleRoot, ".claude-plugin", "plugin.json"), pluginManifest(plugin));
       }
-      await cp(join(projectRoot, "LICENSE"), join(bundleRoot, "LICENSE"));
-      await writeJson(join(bundleRoot, ".claude-plugin", "plugin.json"), pluginManifest(plugin));
-
       entries.push({
         name: plugin.name,
         source: `./plugins/${plugin.name}`,

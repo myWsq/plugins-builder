@@ -44,10 +44,24 @@ jobs:
             echo "::error::Release tag must point to a commit on main"
             exit 1
           fi
-      - name: Verify and build
+      - name: Run tests
+        run: npm test
+      - name: Create read-only source token
+        id: source-token
+        if: vars.PLUGIN_SOURCE_APP_ID != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.PLUGIN_SOURCE_APP_ID }}
+          private-key: ${{ secrets.PLUGIN_SOURCE_APP_PRIVATE_KEY }}
+          owner: ${{ vars.PLUGIN_SOURCE_OWNER }}
+          repositories: ${{ vars.PLUGIN_SOURCE_REPOSITORIES }}
+          permission-contents: read
+      - name: Build catalog
         env:
+          PLUGIN_SOURCE_TOKEN: ${{ steps.source-token.outputs.token || secrets.PLUGIN_SOURCE_TOKEN }}
           SOURCE_REVISION: ${{ steps.source.outputs.sha }}
-        run: npm run verify
+        run: npm run build
+
       - name: Require publishing credential
         env:
           DEPLOY_KEY: ${{ secrets.MARKETPLACE_REPO_SSH_KEY }}
