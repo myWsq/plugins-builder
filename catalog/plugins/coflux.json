@@ -4,7 +4,7 @@
   "origin": {
     "repository": "https://github.com/myWsq/coflux.git",
     "path": "integrations/claude-plugin",
-    "ref": "claude-plugin 0.3.0 (coflux main, 2026-09-06)",
-    "sha": "eecf8d6b7e5b6a5161b514614378c097ec299cd9"
+    "ref": "claude-plugin 0.4.0 (coflux main, 2026-09-06)",
+    "sha": "5dc6f781edc55b5feb3ea25ead9b668c200a002a"
   }
 }
