@@ -26,49 +26,35 @@ catalog/                  Marketplace and plugin metadata
 docs/                     Free-form marketplace documentation
 MARKET_README.md           Source for the generated marketplace README
 plugins/<name>/skills/    Canonical skill source
-src/                      Build and local-sync tooling
+plugins/<name>/fragments/ Reusable skill Markdown, inserted by include
+plugins/<name>/hooks/     Optional hooks tree, shipped verbatim
+plugins/<name>/agents/    Optional agent definitions, shipped verbatim
+src/                      Build and release tooling
 test/                     Determinism and safety tests
 dist/                     Generated marketplace tree
 ```
 
-The compiler emits separate Claude and Codex plugin bundles from the same canonical source, so
-platform-specific app, hook, and authentication configuration can evolve independently.
-`MARKET_README.md` and `docs/` are copied verbatim to the generated marketplace root. They are not
-duplicated inside installable plugin bundles.
+The compiler emits one Claude Code bundle per plugin at `dist/plugins/<name>/` and the marketplace
+index at `dist/.claude-plugin/marketplace.json`. `MARKET_README.md` and `docs/` are copied verbatim
+to the generated marketplace root. They are not duplicated inside installable plugin bundles.
 
-## Target-specific skill content
-
-Markdown files under `plugins/<name>/skills/` keep their normal filenames and may contain simple
-target blocks. Text outside a block is shared by both bundles:
-
-```markdown
-Shared instructions.
-
-<!-- codex -->
-Instructions emitted only in the Codex bundle.
-<!-- /codex -->
-
-<!-- claude -->
-Instructions emitted only in the Claude bundle.
-<!-- /claude -->
-```
-
-Directive markers must occupy their own lines and cannot be nested. The build removes the markers
-and the other target's block. It fails on orphaned, mismatched, nested, or unclosed known
-directives. Non-Markdown files and Markdown without directives are copied byte-for-byte. Adding or
-changing a target block changes installed plugin payload and therefore requires a plugin version
-bump.
+## Reusable skill content
 
 Reusable Markdown lives in flat, kebab-case files under `plugins/<name>/fragments/` and is inserted
-with an include on its own line:
+into skill Markdown with an include on its own line:
 
 ```markdown
-<!-- include codex-request-user-input -->
+<!-- include commit-flow -->
 ```
 
-The compiler selects the target blocks first and then expands includes that remain. Fragment files
-are source-only and are not copied into either plugin bundle. They must end with a newline and may
-not contain target blocks or other includes; missing, inline, or nested references fail the build.
+Fragment files are source-only and are not copied into the plugin bundle. They must end with a
+newline and may not contain other includes; missing, inline, or nested references fail the build.
+Non-Markdown files under `skills/` are copied byte-for-byte.
+
+Skill Markdown is shared by every consumer of the bundle. The compiler no longer renders per-target
+blocks, and a leftover HTML-comment target marker in a skill or fragment fails the build rather than
+shipping. Adding or changing rendered content changes installed plugin payload and therefore
+requires a plugin version bump.
 
 ## Publishing
 
