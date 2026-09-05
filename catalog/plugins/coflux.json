@@ -1,22 +1,10 @@
 {
   "name": "coflux",
-  "version": "0.2.1",
-  "description": "Report Claude Code activity to the local coflux daemon so the coflux command center shows live per-workspace turn states.",
-  "author": {
-    "name": "Shuaiqi Wang",
-    "email": "wsq961@outlook.com",
-    "url": "https://github.com/myWsq"
-  },
-  "homepage": "https://github.com/myWsq/plugins",
-  "repository": "https://github.com/myWsq/plugins-builder",
-  "license": "MIT",
-  "keywords": [
-    "coflux",
-    "agent-status",
-    "daemon",
-    "hooks",
-    "monitoring",
-    "skills"
-  ],
-  "category": "development"
+  "category": "development",
+  "origin": {
+    "repository": "https://github.com/myWsq/coflux.git",
+    "path": "integrations/claude-plugin",
+    "ref": "claude-plugin 0.3.0 (coflux main, 2026-09-06)",
+    "sha": "eecf8d6b7e5b6a5161b514614378c097ec299cd9"
+  }
 }
