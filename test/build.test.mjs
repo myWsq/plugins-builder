@@ -469,6 +469,22 @@ test("release gate treats the marketplace entry as versioned plugin payload", as
   );
 });
 
+test("executor hooks ship intact and require a plugin version bump when changed", async (t) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-executor-release-"));
+  t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const currentDir = join(temporaryRoot, "current");
+  const nextDir = join(temporaryRoot, "next");
+  await build({ outDir: currentDir, sourceRevision: "current" });
+  await cp(currentDir, nextDir, { recursive: true });
+  const shipped = join(nextDir, "plugins", "dev", "hooks");
+  assert.deepEqual(await snapshotTree(shipped), await snapshotTree(join(defaultProjectRoot, "plugins", "dev", "hooks")));
+  const script = join(shipped, "executors.mjs");
+  await writeFile(script, `${await readFile(script, "utf8")}\n// Changed executor policy.\n`);
+  await assert.rejects(checkRelease({ currentDir, nextDir }), /payload changed without a version bump/);
+  await bumpPluginVersion(nextDir, "dev", "999.0.0");
+  await checkRelease({ currentDir, nextDir });
+});
+
 test("release gate resolves plugin roots from marketplace sources across a layout move", async (t) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-layout-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
