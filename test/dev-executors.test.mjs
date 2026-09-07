@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { cp, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { execFile, spawn } from "node:child_process";
+import { cp, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import test from "node:test";
 
 import { runHook } from "../plugins/dev/hooks/executors.mjs";
@@ -97,6 +98,27 @@ async function treeContents(root) {
     else contents.push(await readFile(path, "utf8"));
   }
   return contents.join("\n");
+}
+
+const execFileAsync = promisify(execFile);
+
+// A throwaway repository with one commit on `main`, isolated from the user's git configuration.
+async function gitRepo(t) {
+  const root = await mkdtemp(join(tmpdir(), "dev-workspace-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const git = (...args) => execFileAsync("git", ["-C", root, ...args], {
+    env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0" }
+  });
+  await git("init", "-q");
+  await git("symbolic-ref", "HEAD", "refs/heads/main");
+  await writeFile(join(root, "README.md"), "# fixture\n");
+  await git("add", "README.md");
+  await git("-c", "user.name=fixture", "-c", "user.email=fixture@example.test", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "init");
+  return { root, real: await realpath(root), git };
+}
+
+function skillStart(skill, cwd) {
+  return { hook_event_name: "PreToolUse", tool_name: "Skill", tool_input: { skill, args: "" }, cwd };
 }
 
 test("executor discovery preserves plugin namespaces and project-over-user bindings", async (t) => {
@@ -634,15 +656,87 @@ test("installed hook commands work through aliased paths and share discovery acr
   assert.equal(requests.length, 3);
 });
 
-test("native hook configuration registers command discovery and Agent validation", async () => {
+test("native hook configuration registers command discovery, Agent validation, and Skill workspace snapshots", async () => {
   const config = JSON.parse(await readFile(new URL("../plugins/dev/hooks/hooks.json", import.meta.url), "utf8"));
   const startup = config.hooks.SessionStart;
   assert.ok(startup.some((entry) => !entry.matcher));
   const guard = config.hooks.PreToolUse.find((entry) => entry.matcher === "Agent");
+  const skill = config.hooks.PreToolUse.find((entry) => entry.matcher === "Skill");
   assert.ok(guard);
-  for (const entry of [...startup, guard]) {
+  assert.ok(skill);
+  for (const entry of [...startup, guard, skill]) {
     assert.ok(entry.hooks.some((hook) => hook.type === "command"
       && hook.command.includes('"${CLAUDE_PLUGIN_ROOT}/hooks/executors.mjs"')));
     assert.ok(entry.hooks.every((hook) => hook.type === "command"));
   }
+});
+
+test("session start reports the main worktree from the hook cwd next to executor availability", async (t) => {
+  const f = await fixture(t);
+  const repo = await gitRepo(t);
+  const text = context(await f.run({ cwd: repo.root }));
+  assert.ok(text.startsWith(`<dev-workspace at="session-start">\nkind: main\npath: ${repo.real}\nbranch: main\n</dev-workspace>\n\n<dev-executors>\nDev executor availability`));
+  assert.ok(text.endsWith("\n</dev-executors>"));
+  assert.ok(!text.includes("pending"));
+  assert.ok(!text.includes(f.env.CLAUDE_PROJECT_DIR));
+});
+
+test("a linked worktree is reported with its main worktree after the session moves into it", async (t) => {
+  const f = await fixture(t);
+  const repo = await gitRepo(t);
+  const linked = join(repo.root, ".claude", "worktrees", "20260907-feature");
+  await repo.git("worktree", "add", linked, "-b", "dev/20260907-feature", "HEAD");
+  const text = context(await f.run({ cwd: linked, source: "compact" }));
+  assert.ok(text.startsWith(`<dev-workspace at="session-start">\nkind: linked\npath: ${join(repo.real, ".claude", "worktrees", "20260907-feature")}\nmain: ${repo.real}\nbranch: dev/20260907-feature\n</dev-workspace>`));
+});
+
+test("outside a repository or without git the snapshot says so instead of guessing", async (t) => {
+  const f = await fixture(t);
+  const plain = await mkdtemp(join(tmpdir(), "dev-plain-"));
+  t.after(() => rm(plain, { recursive: true, force: true }));
+  assert.ok(context(await f.run({ cwd: plain })).startsWith(`<dev-workspace at="session-start">\nkind: none\ncwd: ${plain}\n</dev-workspace>`));
+  const missing = async () => { const error = new Error("spawn git ENOENT"); error.code = "ENOENT"; throw error; };
+  assert.ok(context(await f.run({ cwd: plain }, { execFileImpl: missing })).startsWith('<dev-workspace at="session-start">\nkind: unknown\nreason: git could not be run\n</dev-workspace>'));
+  const hanging = async () => { const error = new Error("timeout"); error.killed = true; error.code = null; throw error; };
+  assert.ok(context(await f.run({ cwd: plain }, { execFileImpl: hanging })).includes("\nkind: unknown\n"));
+});
+
+test("dev:explore and dev:write-plan starts refresh the snapshot with pending changes; other skills are untouched", async (t) => {
+  const f = await fixture(t);
+  const repo = await gitRepo(t);
+  assert.deepEqual(await f.run(skillStart("git:commit", repo.root)), {});
+  assert.deepEqual(await f.run(skillStart("dev:execute-plan", repo.root)), {});
+  assert.deepEqual(await f.run({ hook_event_name: "PreToolUse", tool_name: "Skill", tool_input: {}, cwd: repo.root }), {});
+  // Exact equality: facts only, no guidance prose and no executor block at skill start.
+  let text = context(await f.run(skillStart("dev:write-plan", repo.root)), "PreToolUse");
+  assert.equal(text, `<dev-workspace at="dev:write-plan">\nkind: main\npath: ${repo.real}\nbranch: main\npending: 0\n</dev-workspace>`);
+  await writeFile(join(repo.root, "scratch.txt"), "draft\n");
+  text = context(await f.run(skillStart("dev:explore", repo.root)), "PreToolUse");
+  assert.equal(text, `<dev-workspace at="dev:explore">\nkind: main\npath: ${repo.real}\nbranch: main\npending: 1\n</dev-workspace>`);
+  assert.equal(f.requests.length, 0);
+});
+
+test("the CLI emits the skill-start snapshot as hook JSON only", async (t) => {
+  const f = await fixture(t);
+  const repo = await gitRepo(t);
+  const child = spawn(process.execPath, [runtimePath], {
+    cwd: repo.root,
+    env: { ...f.env, PATH: process.env.PATH },
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.setEncoding("utf8").on("data", (chunk) => { stdout += chunk; });
+  child.stderr.setEncoding("utf8").on("data", (chunk) => { stderr += chunk; });
+  const exited = new Promise((resolve, reject) => {
+    child.on("error", reject);
+    child.on("close", resolve);
+  });
+  child.stdin.end(JSON.stringify(skillStart("dev:write-plan", repo.root)));
+  assert.equal(await exited, 0);
+  assert.equal(stderr, "");
+  const output = JSON.parse(stdout);
+  assert.equal(output.hookSpecificOutput.hookEventName, "PreToolUse");
+  assert.equal(output.hookSpecificOutput.additionalContext, `<dev-workspace at="dev:write-plan">\nkind: main\npath: ${repo.real}\nbranch: main\npending: 0\n</dev-workspace>`);
+  assert.equal(Object.keys(output.hookSpecificOutput).length, 2);
 });
