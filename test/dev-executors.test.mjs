@@ -634,8 +634,9 @@ test("installed hook commands work through aliased paths and share discovery acr
   });
   const startup = { hook_event_name: "SessionStart", source: "startup" };
   const initial = context(await invoke(startup));
+  assert.ok(initial.startsWith("<dev-principles>\n# Working principles\n"));
   assert.ok(initial.includes(`dev:gemini-executor -> ${model}: verified`));
-  context(await invoke({ ...startup, source: "compact" }));
+  assert.ok(context(await invoke({ ...startup, source: "compact" })).startsWith("<dev-principles>\n"));
   assert.deepEqual(await invoke(dispatch()), {});
   denied(await invoke(dispatch("dev:kimi-executor")));
   assert.equal(requests.length, 1);
@@ -739,4 +740,32 @@ test("the CLI emits the skill-start snapshot as hook JSON only", async (t) => {
   assert.equal(output.hookSpecificOutput.hookEventName, "PreToolUse");
   assert.equal(output.hookSpecificOutput.additionalContext, `<dev-workspace at="dev:write-plan">\nkind: main\npath: ${repo.real}\nbranch: main\npending: 0\n</dev-workspace>`);
   assert.equal(Object.keys(output.hookSpecificOutput).length, 2);
+});
+
+test("session start injects the shipped working principles ahead of workspace and executor facts", async (t) => {
+  const f = await fixture(t);
+  const repo = await gitRepo(t);
+  // The fixture plugin root ships no principles file: the block is simply absent, nothing fails.
+  assert.ok(context(await f.run({ cwd: repo.root })).startsWith('<dev-workspace at="session-start">'));
+  await mkdir(join(f.env.CLAUDE_PLUGIN_ROOT, "hooks"), { recursive: true });
+  await writeFile(join(f.env.CLAUDE_PLUGIN_ROOT, "hooks", "principles.md"), "# Working principles\n\n- Lead with the conclusion.\n\n");
+  for (const source of ["startup", "resume", "clear", "compact"]) {
+    const text = context(await f.run({ cwd: repo.root, source }));
+    assert.ok(text.startsWith(`<dev-principles>\n# Working principles\n\n- Lead with the conclusion.\n</dev-principles>\n\n<dev-workspace at="session-start">\nkind: main\npath: ${repo.real}\n`));
+    assert.ok(text.endsWith("\n</dev-executors>"));
+  }
+  // Skill starts and dispatch checks carry facts only; the principles ride with the session, not with every tool call.
+  const skill = context(await f.run(skillStart("dev:write-plan", repo.root)), "PreToolUse");
+  assert.ok(!skill.includes("dev-principles"));
+  assert.deepEqual(await f.run(dispatch()), {});
+  // An empty file drops the block rather than injecting an empty envelope.
+  await writeFile(join(f.env.CLAUDE_PLUGIN_ROOT, "hooks", "principles.md"), "\n");
+  assert.ok(context(await f.run({ cwd: repo.root })).startsWith('<dev-workspace at="session-start">'));
+});
+
+test("the plugin ships non-empty working principles next to its hook", async () => {
+  const text = await readFile(new URL("../plugins/dev/hooks/principles.md", import.meta.url), "utf8");
+  assert.ok(text.startsWith("# Working principles\n"));
+  assert.ok(text.endsWith("\n"));
+  assert.ok(!text.includes("<dev-"), "The file is wrapped by the hook; it must not carry its own delimiter.");
 });
