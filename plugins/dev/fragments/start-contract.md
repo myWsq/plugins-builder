@@ -1,0 +1,12 @@
+## Start contract
+
+Before handing work to the next phase, resolve these items internally. This is a completeness check, not a questionnaire. Reuse the current request, earlier user decisions, and inspected facts; record the source of each result briefly in the handoff or plan. Do not create a separate state file.
+
+- **Direction and scope**: resolve decisions that affect the outcome. Ask only about a concrete ambiguity or tradeoff that the request, code, and conventions cannot settle. Never ask whether the requirement or direction is confirmed; summarize settled conclusions without requiring a reply.
+- **Stop after**: `discussion`, `plan`, or `implementation` (including verification), derived from the user's requested scope. A discussion request ends in chat; a plan-only request ends after writing the plan; an implementation request continues through planning and execution. Ask only when the requested endpoint is genuinely unclear. Readiness is not authorization to expand scope, and silence is not approval.
+- **Execution**: reuse a user-selected mode and executor. Otherwise resolve the host-supported default using `dev:execute-plan`'s "Choose execution mode" rules when execution is needed; use `deferred` for discussion or plan-only work with no selection. Never ask for an executor just to finish a discussion or plan. A specified but unavailable executor is a blocker, not permission to substitute one.
+- **Workspace**: inspect the actual workspace and follow the planning/execution isolation rules, honoring an explicit request to stay. Check cleanliness, dependencies, and drift yourself at the phase that needs them; report concrete blockers instead of asking the user to perform routine checks.
+
+For each item, retain a value and its basis: user request/earlier decision, applicable default, inspected fact, or not applicable. Only an unresolved user decision needs a question; name the missing decision, not a generic confirmation. Do not advance dependent work while it remains unresolved. A later explicit user instruction overrides an older handoff or plan field; update the affected fields without reopening settled items.
+
+State the next action briefly and continue up to the requested endpoint. Discussion summaries carry the endpoint and any selected execution/workspace preferences; plans record `Execution:`, `Stop after:`, and `Workspace:` with a short basis. Pushing, opening PRs, and merging require an explicit user request; STOP and BLOCK conditions still apply.
