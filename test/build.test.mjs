@@ -552,17 +552,17 @@ test("release gate blocks plugin removal unless declared in catalog.removed", as
   const projectRoot = await copyProjectFixture(temporaryRoot);
   const catalogPath = join(projectRoot, "catalog", "marketplace.json");
   await updateJson(catalogPath, (catalog) => {
-    catalog.plugins = catalog.plugins.filter((name) => name !== "coflux");
+    catalog.plugins = catalog.plugins.filter((name) => name !== "arch");
     delete catalog.removed;
   });
   await build({ projectRoot, outDir: nextDir, sourceRevision: "next" });
   await assert.rejects(
     checkRelease({ currentDir, nextDir }),
-    /without a catalog\.removed declaration: coflux/
+    /without a catalog\.removed declaration: arch/
   );
 
   await updateJson(catalogPath, (catalog) => {
-    catalog.removed = ["coflux"];
+    catalog.removed = ["arch"];
   });
   await build({ projectRoot, outDir: nextDir, sourceRevision: "next" });
   await checkRelease({ currentDir, nextDir });

@@ -9,10 +9,10 @@
     "dev",
     "git",
     "arch",
-    "coflux",
     "market"
   ],
   "removed": [
-    "commit"
+    "commit",
+    "coflux"
   ]
 }

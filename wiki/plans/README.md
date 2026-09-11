@@ -8,7 +8,6 @@ Plans are named `YYYYMMDD-short-slug`. The numbered entries (003–009) predate 
 | [004](004-arch-web-skill.md) | DONE | self | 003 |
 | [005](005-arch-server-skill.md) | DONE | self | 004 |
 | [006](006-commit-push-skill.md) | DONE | subagent | none |
-| [007](007-coflux-plugin.md) | DONE | self | none |
 | [008](008-remove-dev-agents-broker.md) | DONE | self | none |
 | [009](009-plugin-executor-agents.md) | DONE | self | 008 |
 | [20260903-explore-product-clarify](20260903-explore-product-clarify.md) | DONE | self | none |
