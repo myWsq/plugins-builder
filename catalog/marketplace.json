@@ -13,6 +13,7 @@
   ],
   "removed": [
     "commit",
-    "coflux"
+    "coflux",
+    "subagent-model"
   ]
 }
