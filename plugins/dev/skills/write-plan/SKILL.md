@@ -25,10 +25,11 @@ A requirement that genuinely decomposes may become a small **plan group** whose 
 
 ### 1. Establish context
 
-- If continuing from `dev:explore`, reuse its terrain, requirement, product conclusions, requested endpoint, and execution/workspace preferences. Do not re-ask settled decisions.
-- For direct requests, do lightweight recon: docs, root config, CI, relevant files, validation commands, and local conventions. Resolve factual questions yourself; ask only about remaining user decisions with a recommended answer. A direct plan-only request stops at the plan; an implementation request continues to execution.
-- If clarification uncovers a genuinely open-ended design space, switch to `dev:explore` to converge on a direction before writing the plan. Switch likewise when the request is perceptible to its consumer — it changes what they see or do — and no product conclusions (interaction flow, states, UI structure, scope) have been settled: `dev:explore` clarifies the product before the design, and this skill does not repeat that stage.
-- If planning itself surfaces a new decision: when minor, decide it yourself following the settled direction and local conventions, and record it under Decisions & tradeoffs marked `(decided while planning)`; when it contradicts the settled direction or the code's current state, stop and report instead of guessing or re-asking piecemeal.
+- If continuing from `dev:explore`, reuse the explored terrain, clarified requirement, the product conclusions when the change is perceptible to its consumer, and the departure-check answers. The grilling and all confirmations already happened there: do not re-interrogate settled decisions and do not re-confirm anything. If the handoff records no departure check at all, the check did not happen: run `dev:explore`'s departure check now, before the first write. An item the check legitimately omitted — execution mode when `dev:execute-plan` is absent, workspace outside the main worktree — is not a missing answer; any other missing item is an unanswered confirmation, not a settled default.
+- If starting from a direct request, do lightweight recon: docs, root config, CI, relevant files, exact validation commands, and local conventions.
+- If clarification uncovers a genuinely open-ended design space, switch to `dev:explore` to converge on a direction before writing the plan. Switch likewise when the request is perceptible to its consumer — it changes what they see or do — and no product conclusions (interaction flow, states, UI structure, scope) have been settled: `dev:explore` clarifies the product before the design, and this skill does not repeat that stage. Decide this before asking anything, so the departure check happens once, in whichever skill owns it.
+- For direct requests that stay here, resolve factual questions from the code, then clarify the remaining open decisions following the same grill-by-default convention as `dev:explore` (one at a time, each with a recommended answer; honor "don't grill me"), and finish with `dev:explore`'s departure check — direction, execution mode, autopilot or review pause, workspace — so nothing needs confirmation later. For the execution-mode item, ask the execution-mode question defined in the installed `dev:execute-plan` skill's "Choose execution mode" section (the canonical definition); if that skill cannot be located, omit the item — `dev:execute-plan` asks at dispatch time.
+- If planning itself surfaces a new decision: when minor, decide it yourself following the approved direction and local conventions, and record it under Decisions & tradeoffs marked `(decided while planning)`; when it contradicts the approved direction or the code's current state, stop and report instead of guessing or re-asking piecemeal.
 
 ### 2. Decompose only when it pays
 
@@ -53,7 +54,7 @@ Group membership lives only in `wiki/plans/README.md`; each member stays self-co
 
 ### 3. Move off the main worktree
 
-Plans and their execution never land on the repository's main worktree. Before the first write, check where the session is. In Claude Code the plugin's hooks inject a `<dev-workspace>` block — `kind` main or linked, `path`, `branch`, and at skill start `pending` — at session start and again when this skill starts: read the latest one, unless a worktree switch you performed since supersedes it. Without such a block, the main worktree is the first entry of `git worktree list`; compare it with `git rev-parse --show-toplevel`. When they match — whatever the branch — cut a working branch and worktree named after the requirement and continue there. Skip this step outside a git repository, inside a linked worktree (one created earlier by this step or by `dev:execute-plan` already isolates the work), or when the user asked to stay put, in this conversation or the handoff.
+Plans and their execution never land on the repository's main worktree. Before the first write, check where the session is. In Claude Code the plugin's hooks inject a `<dev-workspace>` block — `kind` main or linked, `path`, `branch`, and at skill start `pending` — at session start and again when this skill starts: read the latest one, unless a worktree switch you performed since supersedes it. Without such a block, the main worktree is the first entry of `git worktree list`; compare it with `git rev-parse --show-toplevel`. When they match — whatever the branch — cut a working branch and worktree named after the requirement and continue there. Skip this step outside a git repository, inside a linked worktree (one created earlier by this step or by `dev:execute-plan` already isolates the work), or when the user asked to stay put, in this conversation or at the departure check.
 
 1. Fix the requirement's id, `YYYYMMDD-short-slug`: the date from `date +%Y%m%d`, the slug derived from the requirement — for a plan group, the requirement's slug, not a member's. Step 4 reuses it verbatim as the plan filename; the members of a group share its date and carry their own slugs.
 2. Make sure `.claude/worktrees/` is ignored: `git check-ignore -q .claude/worktrees` — if not, append `.claude/worktrees/` to the local `.git/info/exclude`, never to the tracked `.gitignore`.
@@ -94,9 +95,9 @@ Use this structure:
 - Risk: LOW | MED | HIGH
 - Depends on: none | wiki/plans/YYYYMMDD-*.md
 - Category: bug | feature | tests | refactor | docs | dx | migration
-- Execution: subagent[ <model or executor agent>] | self | deferred — include the user decision or applicable default as its basis
-- Stop after: plan | implementation — include the user request as its basis
-- Workspace: isolated | current — include the inspected workspace or user instruction as its basis
+- Execution: subagent[ <model or executor agent>] | self | deferred — from the departure check; `deferred` only when no check settled it, and `dev:execute-plan` resolves it at dispatch
+- Stop after: plan | implementation — from the departure check's autopilot item (review pause means `plan`)
+- Workspace: isolated | current — from the departure check's workspace item or the inspected workspace
 - Planned at: `<short-sha>`, <YYYY-MM-DD>
 
 ## Requirement
@@ -188,9 +189,9 @@ What future maintainers or reviewers should watch.
 
 ### 5. Handoff
 
-- When `Stop after: implementation`, summarize the plan and its workspace path/branch, commit only `wiki/plans/`, and start `dev:execute-plan` with the recorded preferences without another question. Hand over an entire plan group together.
-- When `Stop after: plan`, stop after writing and summarizing it. Leaving `wiki/plans/` uncommitted is fine; execution commits pending plan files during preflight. Name the absolute worktree path so another session can find it.
-- A later request to execute overrides `Stop after: plan`: update the endpoint, reuse existing decisions, and resolve a deferred executor using the execution skill's host-supported default. Ask only about new unresolved user decisions, never whether the direction is confirmed.
+- After a completed departure check — whether it happened in `dev:explore` or here — do not ask anything. When `Stop after: implementation`, summarize the plan for the record — naming the worktree path and branch when step 3 moved the session — commit only `wiki/plans/`, and start `dev:execute-plan` with the recorded execution mode. For a plan group, hand over the whole group — its concurrent dispatch is defined in `dev:execute-plan`.
+- When `Stop after: plan` — the review pause taken at the departure check — stop after writing the plan. Leaving `wiki/plans/` uncommitted is fine: `dev:execute-plan` commits pending `wiki/plans/` files itself during preflight. When step 3 moved the session, the paused plan exists only on `dev/<id>` in that worktree — say so, with the absolute path, since a fresh session in the main worktree will not find it. When the user comes back, resume directly with the recorded execution mode; do not re-run the departure check unless the review changed the plan's direction.
+- If the departure check omitted the execution item because `dev:execute-plan` was absent: ask once — execute now (self-execution or a named executor) or review first — then proceed accordingly. A later request to execute likewise overrides `Stop after: plan`: update the endpoint, reuse the recorded decisions, and resolve a `deferred` executor through `dev:execute-plan`, without reopening the direction.
 
 ## Quality bar
 

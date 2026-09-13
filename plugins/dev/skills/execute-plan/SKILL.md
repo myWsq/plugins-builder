@@ -27,12 +27,12 @@ The plan is an outcome contract, not a step-by-step script: the executor designs
 ### 1. Locate and read the plan
 
 - Use the user-provided plan id or path, or pick the next TODO plan from `wiki/plans/README.md`.
-- Read the full plan and any listed prerequisite plans. Read `Execution:`, `Stop after:`, and `Workspace:` when present, together with the current user request. Missing fields in older plans are resolved through the start contract, not a new confirmation gate. A current request to execute supersedes an older plan-only endpoint; without execution authorization, stop at the recorded endpoint.
+- Read the full plan and any listed prerequisite plans. Read `Execution:`, `Stop after:`, and `Workspace:` when present, together with the current user request — they record what the departure check settled. Fields missing from an older plan are resolved through the start contract, falling back to the execution-mode question below only when no departure check ever ran. A current request to execute supersedes an older plan-only endpoint; without execution authorization, stop at the recorded endpoint.
 - Stop if a prerequisite is not DONE.
 
 ### 2. Choose execution mode
 
-This section defines execution defaults and optional choices. Upstream skills reuse it when execution is requested; there is no mandatory execution-mode question.
+This section is the canonical definition of execution modes: upstream departure checks (`dev:explore`, `dev:write-plan`) read it by name to build their question instead of duplicating the wording.
 
 Two modes, in default preference order:
 
@@ -41,19 +41,26 @@ Two modes, in default preference order:
 
 Selection rules:
 
-1. Honor the latest explicit user selection, then a recorded handoff or plan selection. Do not re-confirm it. Legacy local-agent values (`agent:`-prefixed ids, or bare `codex`, `cursor`, `claude`) map to `subagent` as before.
-2. If no selection exists (including `Execution: deferred`), use generic subagent delegation when supported and permitted by the host; otherwise self-execute. State the resolved mode briefly and record it, without asking.
-3. A user-specified executor or model that cannot run is a blocker: report why and ask for a replacement only if needed. Never silently substitute it.
+1. If the user named a mode or executor in this conversation, use it — a current explicit instruction supersedes any recorded value.
+2. Otherwise, if a departure check already recorded an execution mode — in the handoff or in the plan's `Execution:` field — use it without asking. The departure check is standing authorization; do not re-confirm. Treat a legacy local-agent value (an `agent:`-prefixed id, or bare `codex`, `cursor`, `claude`) as `subagent`: that channel no longer exists, and a subagent stays inside the host's permission envelope, so no new consent boundary is crossed.
+3. If upstream asked to delegate but did not name a target, use a subagent.
+4. When no departure check happened and no mode was named — including `Execution: deferred` reaching actual execution — ask the execution-mode question defined below. This answer stands; do not ask again.
 
-If a default or generic delegation preference cannot be supported by the host, use self-execution and say so. This fallback does not override a user-specified executor or model.
+If a recorded or default delegation preference cannot be supported by the host, use self-execution and say so in the final report: the same host permission envelope is retained and no new consent boundary is crossed. This fallback does not override a user-specified executor or model.
 
-Model choice: use the host's generic subagent with `model: opus` only where that alias is supported; otherwise omit the override and use the host default. Honor a different model or executor selected by the user. A model-pinned executor agent is dispatched without a `model` argument, since an override replaces its pinned binding. Never infer host support from a Claude-specific example.
+Model choice: use the host's generic subagent with `model: opus` only where that alias is supported; otherwise omit the override and use the host default. Honor a different target recorded at the departure check or named by the user: another Claude tier alias goes to the generic subagent with that `model`. A model-pinned executor agent is dispatched without a `model` argument, since an override replaces its pinned binding. Never infer host support from a Claude-specific example.
 
 **Executor availability comes from hooks.** Use the latest injected `<dev-executors>` block, headed `Dev executor availability`: `verified` means its pinned ID was listed by the relay, `unavailable` means a complete listing excluded it or a model override conflicts, and `unverified` means discovery could not establish availability. The snapshot describes disk definitions, not the host's registry: intersect it with the agent types actually available in the host, and confirm the pinned ID in the host's agent description agrees with the snapshot. A disagreement requires reloading the agent definition and refreshing the session before dispatch; do not guess which binding will run. Never carry model IDs from memory, and never issue model-list requests or launch probe agents from this skill.
 
 The `SessionStart` hook discovers and caches availability; the `PreToolUse(Agent)` hook reuses a fresh cache or refreshes it before dispatch. Respect its denial, keep the user's chosen executor, and report the problem instead of silently substituting a model. A missing hook snapshot, an executor outside discovery's scope, or a failed listing is **unverified**, not unavailable: retain the host-visible option, label it unverified, and tell the user to verify actual serving via relay-side logs. This is also the fallback in hosts without these hooks. A model listing is not proof of which model ultimately served a run.
 
-**Optional executor selection.** Show choices only when the user asks to choose/change the executor or an actual blocker requires a replacement. Offer the host-supported generic subagent, host-visible pinned executors filtered by the hook rules above, and self-execution. List eligible pinned executors directly rather than asking "others" and then asking again. Label unverified candidates, omit unavailable ones, and retain an existing user selection unless the user changes it. Never run model discovery from the skill.
+The **execution-mode question** — asked here under selection rule 4, and by upstream departure checks that read this section — offers the following options, omitting any whose candidates have all been excluded:
+
+1. **Subagent (opus)** (recommended) — the host's generic subagent with `model: opus`, where the host supports that alias; otherwise the host's default model.
+2. **Subagent (pinned executor)** — the host-visible model-pinned executor types, filtered by the hook rules above. List the eligible vendors directly in the option description rather than asking "others" and then asking again — e.g. "gemini / kimi (unverified)" — marking any `unverified` entries explicitly and excluding `unavailable` ones. When more than one survives and the user picks this option, ask one structured follow-up choosing among them, first verified survivor recommended (or first unverified survivor when none is verified); skip the follow-up when only one survives. The follow-up is part of this question's contract — it never counts as re-asking. Omit this option when no candidate remains, and briefly explain if all discovered candidates are unavailable. Record the answer as mode `subagent` with the chosen executor agent. Consume the snapshot without running another discovery request.
+3. **Self** — self-execution.
+
+Outside this question, show executor choices only when the user asks to change the executor or an actual blocker requires a replacement; retain an existing selection unless the user changes it. Never run model discovery from the skill.
 
 ### 3. Preflight
 
