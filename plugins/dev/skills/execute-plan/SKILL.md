@@ -27,7 +27,7 @@ The plan is an outcome contract, not a step-by-step script: the executor designs
 ### 1. Locate and read the plan
 
 - Use the user-provided plan id or path, or pick the next TODO plan from `wiki/plans/README.md`.
-- Read the full plan and any listed prerequisite plans. Read `Execution:`, `Stop after:`, and `Workspace:` when present, together with the current user request — they record what the departure check settled. Fields missing from an older plan are resolved through the start contract, falling back to the execution-mode question below only when no departure check ever ran. A current request to execute supersedes an older plan-only endpoint; without execution authorization, stop at the recorded endpoint.
+- Read the full plan and any listed prerequisite plans. Read `Execution:`, `Stop after:`, and `Workspace:` when present, together with the current user request — they record what the departure check settled and where the planner put the work. Fields missing from an older plan are resolved through the start contract, falling back to the execution-mode question below only when no departure check ever ran. A current request to execute supersedes an older plan-only endpoint; without execution authorization, stop at the recorded endpoint.
 - Stop if a prerequisite is not DONE.
 
 ### 2. Choose execution mode
