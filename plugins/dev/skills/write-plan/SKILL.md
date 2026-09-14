@@ -95,7 +95,7 @@ Use this structure:
 - Risk: LOW | MED | HIGH
 - Depends on: none | wiki/plans/YYYYMMDD-*.md
 - Category: bug | feature | tests | refactor | docs | dx | migration
-- Execution: subagent[ <model or executor agent>] | self | deferred — from the departure check; `deferred` only when no check settled it, and `dev:execute-plan` resolves it at dispatch
+- Execution: subagent(opus) | subagent(fable) | self | deferred — from the departure check; `deferred` only when no check settled it, and `dev:execute-plan` resolves it at dispatch
 - Stop after: plan | implementation — from the departure check's autopilot item (review pause means `plan`; advisor review means `implementation`)
 - Plan review: none | advisor — from the departure check's autopilot item; `advisor` means step 5 ran before handoff, or notes why it was skipped
 - Workspace: isolated | current — from the departure check's workspace item or the inspected workspace
@@ -205,7 +205,7 @@ Skip it as well when the latest injected `<dev-orchestrator>` block (in Claude C
 
 - After a completed departure check — whether it happened in `dev:explore` or here — do not ask anything. When `Stop after: implementation` — directly, or after step 5 under `Plan review: advisor` — summarize the plan for the record — naming the worktree path and branch when step 3 moved the session — commit only `wiki/plans/`, and start `dev:execute-plan` with the recorded execution mode. For a plan group, hand over the whole group — its concurrent dispatch is defined in `dev:execute-plan`.
 - When `Stop after: plan` — the review pause taken at the departure check — stop after writing the plan. Leaving `wiki/plans/` uncommitted is fine: `dev:execute-plan` commits pending `wiki/plans/` files itself during preflight. When step 3 moved the session, the paused plan exists only on `dev/<id>` in that worktree — say so, with the absolute path, since a fresh session in the main worktree will not find it. When the user comes back, resume directly with the recorded execution mode; do not re-run the departure check unless the review changed the plan's direction.
-- If the departure check omitted the execution item because `dev:execute-plan` was absent: ask once — execute now (self-execution or a named executor) or review first — then proceed accordingly. A later request to execute likewise overrides `Stop after: plan`: update the endpoint, reuse the recorded decisions, and resolve a `deferred` executor through `dev:execute-plan`, without reopening the direction.
+- If the departure check omitted the execution item because `dev:execute-plan` was absent: ask once — execute now (self-execution or a subagent) or review first — then proceed accordingly. A later request to execute likewise overrides `Stop after: plan`: update the endpoint, reuse the recorded decisions, and resolve a `deferred` mode through `dev:execute-plan`, without reopening the direction.
 
 ## Quality bar
 

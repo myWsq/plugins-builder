@@ -248,14 +248,22 @@ test("build ships plugin hooks into the bundle", async (t) => {
 test("build ships plugin agents into the bundle", async (t) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-agents-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const projectRoot = await copyProjectFixture(temporaryRoot);
+  const agentsRoot = join(projectRoot, "plugins", "dev", "agents");
+  await mkdir(agentsRoot, { recursive: true });
+  await writeFile(join(agentsRoot, "fixture.md"), "---\nname: fixture\ndescription: Fixture agent.\n---\nDo the task.\n");
   const outDir = join(temporaryRoot, "dist");
-  await build({ outDir, sourceRevision: "test-revision" });
+  await build({ projectRoot, outDir, sourceRevision: "test-revision" });
 
   assert.deepEqual(
     await snapshotTree(join(outDir, "plugins", "dev", "agents")),
-    await snapshotTree(join(defaultProjectRoot, "plugins", "dev", "agents"))
+    await snapshotTree(agentsRoot)
   );
   await assert.rejects(lstat(join(outDir, "plugins", "git", "agents")), { code: "ENOENT" });
+});
+
+test("the dev plugin ships no agent definitions", async () => {
+  await assert.rejects(lstat(join(defaultProjectRoot, "plugins", "dev", "agents")), { code: "ENOENT" });
 });
 
 test("build rejects a plugin hooks directory without valid hooks.json", async (t) => {
@@ -471,8 +479,8 @@ test("release gate treats the marketplace entry as versioned plugin payload", as
   );
 });
 
-test("executor hooks ship intact and require a plugin version bump when changed", async (t) => {
-  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-executor-release-"));
+test("context hooks ship intact and require a plugin version bump when changed", async (t) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "plugins-builder-hooks-release-"));
   t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
   const currentDir = join(temporaryRoot, "current");
   const nextDir = join(temporaryRoot, "next");
@@ -480,8 +488,8 @@ test("executor hooks ship intact and require a plugin version bump when changed"
   await cp(currentDir, nextDir, { recursive: true });
   const shipped = join(nextDir, "plugins", "dev", "hooks");
   assert.deepEqual(await snapshotTree(shipped), await snapshotTree(join(defaultProjectRoot, "plugins", "dev", "hooks")));
-  const script = join(shipped, "executors.mjs");
-  await writeFile(script, `${await readFile(script, "utf8")}\n// Changed executor policy.\n`);
+  const script = join(shipped, "context.mjs");
+  await writeFile(script, `${await readFile(script, "utf8")}\n// Changed snapshot policy.\n`);
   await assert.rejects(checkRelease({ currentDir, nextDir }), /payload changed without a version bump/);
   await bumpPluginVersion(nextDir, "dev", "999.0.0");
   await checkRelease({ currentDir, nextDir });
@@ -586,24 +594,4 @@ test("marketplace documentation is outside the plugin version contract", async (
   await writeFile(join(nextDir, "docs", "dev.md"), "docs-only change\n");
 
   await checkRelease({ currentDir, nextDir });
-});
-
-test("executor agents state their pinned model in the description", async () => {
-  const agentsDir = join(defaultProjectRoot, "plugins", "dev", "agents");
-  const files = (await readdir(agentsDir)).filter((name) => name.endsWith(".md"));
-  assert.ok(files.length > 0, "expected at least one executor agent");
-
-  for (const file of files) {
-    const source = await readFile(join(agentsDir, file), "utf8");
-    const name = source.match(/^name:\s*(\S+)$/m)?.[1];
-    const model = source.match(/^model:\s*(\S+)$/m)?.[1];
-    const description = source.match(/^description:\s*(.+)$/m)?.[1] ?? "";
-
-    assert.equal(name, file.replace(/\.md$/, ""), `${file}: name must match filename`);
-    assert.ok(model, `${file}: missing pinned model`);
-    assert.ok(
-      description.includes(model),
-      `${file}: description must state the pinned model ${model} verbatim — it is the only copy callers can read at dispatch time`
-    );
-  }
 });
