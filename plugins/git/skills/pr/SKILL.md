@@ -15,6 +15,8 @@ The commit never reaches the remote default branch, and the working tree's branc
 
 ## 2. Publish
 
+The pull request title and body follow the same language rule as the commit message: English by default, another language only on an explicit request from the user in this session.
+
 On a non-default branch:
 
 1. `git push -u origin HEAD` to set the upstream.
