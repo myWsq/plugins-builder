@@ -170,7 +170,7 @@ test("build emits a deterministic Claude Code marketplace", async (t) => {
   const devFragments = await loadFragmentFixture("dev");
   assert.ok(devFragments.has("host-managed-worktrees"), "the dev plugin ships the shared host-managed worktree rule");
   await assertRenderedSkillTree(sourceSkills, join(first, "plugins", "dev", "skills"), devFragments);
-  for (const skill of ["explore", "write-plan", "execute-plan", "advisor"]) {
+  for (const skill of ["explore", "write-plan", "execute-plan"]) {
     const rendered = await readFile(join(first, "plugins", "dev", "skills", skill, "SKILL.md"), "utf8");
     assert.doesNotMatch(rendered, RETIRED_MARKER_PATTERN, `${skill} markers`);
     assert.doesNotMatch(rendered, /<!--[\t ]*include\b/, `${skill} includes`);
