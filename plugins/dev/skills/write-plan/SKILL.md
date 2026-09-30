@@ -146,6 +146,15 @@ What is true after this milestone. Validation: `<command>` -> expected result.
 Only hazards actually found during exploration — hidden coupling, ordering
 constraints, misleading names — with `file:line`. Delete this section if empty.
 
+## Merge and deploy
+
+What the diff will not tell a reviewer, found during exploration and planning:
+checks before merging that CI will not run, and what deployment needs —
+environment variables and secrets by name only, migrations and their order,
+configuration or infrastructure changes, feature flags, rollout ordering across
+services, how to roll back. `dev:execute-plan` builds the pull request body
+from this section. Delete it if empty.
+
 ## Scope
 
 In scope:

@@ -109,7 +109,7 @@ test("a linked worktree is reported with its main worktree after the session mov
   const linked = join(repo.root, ".claude", "worktrees", "20260907-feature");
   await repo.git("worktree", "add", linked, "-b", "dev/20260907-feature", "HEAD");
   const text = context(await f.run({ cwd: linked, source: "compact" }));
-  assert.equal(text, `<dev-workspace at="session-start">\nkind: linked\npath: ${join(repo.real, ".claude", "worktrees", "20260907-feature")}\nmain: ${repo.real}\nbranch: dev/20260907-feature\n</dev-workspace>`);
+  assert.equal(text, `<dev-workspace at="session-start">\nkind: linked\npath: ${join(repo.real, ".claude", "worktrees", "20260907-feature")}\nmain: ${repo.real}\nbranch: dev/20260907-feature\n</dev-workspace>\n\n<dev-publish at="session-start">\npr: unavailable\nreason: main worktree branch main tracks no remote branch\n</dev-publish>`);
 });
 
 test("outside a repository or without git the snapshot says so instead of guessing", async (t) => {
@@ -137,11 +137,10 @@ test("a branch name cannot smuggle control characters into the block", async (t)
   assert.ok(text.includes("\nbranch: feat?[0m?\n"));
 });
 
-test("dev:explore and dev:write-plan starts refresh the snapshot with pending changes; other skills are untouched", async (t) => {
+test("dev skill starts refresh the snapshot with pending changes; other skills are untouched", async (t) => {
   const f = await fixture(t);
   const repo = await gitRepo(t);
   assert.deepEqual(await f.run(skillStart("git:commit", repo.root)), {});
-  assert.deepEqual(await f.run(skillStart("dev:execute-plan", repo.root)), {});
   assert.deepEqual(await f.run({ hook_event_name: "PreToolUse", tool_name: "Skill", tool_input: {}, cwd: repo.root }), {});
   // Exact equality: facts only, no guidance prose at skill start.
   let text = context(await f.run(skillStart("dev:write-plan", repo.root)), "PreToolUse");
@@ -192,7 +191,97 @@ test("skill starts read the orchestrator model from the last assistant transcrip
   // Missing transcript, other skills, and other tools inject nothing.
   text = context(await f.run({ ...skillStart("dev:explore", repo.root), transcript_path: join(outside, "missing.jsonl") }), "PreToolUse");
   assert.ok(!text.includes("<dev-orchestrator"));
-  assert.deepEqual(await f.run({ ...skillStart("dev:execute-plan", repo.root), transcript_path: transcript }), {});
+  // dev:execute-plan gets workspace and publish facts, but no tier: it dispatches no audit.
+  assert.ok(!context(await f.run({ ...skillStart("dev:execute-plan", repo.root), transcript_path: transcript }), "PreToolUse").includes("<dev-orchestrator"));
+});
+
+// A linked worktree whose main worktree's `main` tracks `origin/main`, with the remote URL and gh stubbed.
+async function publishable(t, { url = "git@github.com:owner/repo.git", ghResult = "ok" } = {}) {
+  const repo = await gitRepo(t);
+  await repo.git("update-ref", "refs/remotes/origin/main", "HEAD");
+  await repo.git("remote", "add", "origin", "/unused");
+  await repo.git("config", "branch.main.remote", "origin");
+  await repo.git("config", "branch.main.merge", "refs/heads/main");
+  const linked = join(repo.root, ".claude", "worktrees", "20260930-feature");
+  await repo.git("worktree", "add", linked, "-b", "dev/20260930-feature", "HEAD");
+  const calls = [];
+  const execFileImpl = async (file, args, options) => {
+    if (file === "gh") {
+      calls.push(args);
+      if (ghResult === "ok") return { stdout: "" };
+      const error = new Error(ghResult);
+      error.code = { missing: "ENOENT", denied: 1, hanging: null }[ghResult];
+      throw error;
+    }
+    if (args.includes("get-url")) return { stdout: `${url}\n` };
+    return execFileAsync(file, args, options);
+  };
+  return { repo, linked, calls, execFileImpl };
+}
+
+function publishBlock(text) {
+  return text.slice(text.indexOf("<dev-publish"));
+}
+
+test("dev:execute-plan start reports a pull request as available from a linked worktree with a tracked base and gh login", async (t) => {
+  const f = await fixture(t);
+  const p = await publishable(t);
+  const text = context(await f.run(skillStart("dev:execute-plan", p.linked), { execFileImpl: p.execFileImpl }), "PreToolUse");
+  assert.ok(text.startsWith('<dev-workspace at="dev:execute-plan">\nkind: linked\n'));
+  assert.ok(text.includes("\nbranch: dev/20260930-feature\npending: 0\n</dev-workspace>\n\n<dev-publish"));
+  assert.equal(publishBlock(text), '<dev-publish at="dev:execute-plan">\npr: available\nremote: origin\nhost: github.com\nbase: main\n</dev-publish>');
+  assert.deepEqual(p.calls, [["auth", "status", "--hostname", "github.com"]]);
+  // A fresh session and the planning skills never reach gh.
+  for (const source of ["startup", "clear"]) assert.ok(!context(await f.run({ cwd: p.linked, source }, { execFileImpl: p.execFileImpl })).includes("<dev-publish"));
+  assert.ok(!context(await f.run(skillStart("dev:write-plan", p.linked), { execFileImpl: p.execFileImpl }), "PreToolUse").includes("<dev-publish"));
+  assert.equal(p.calls.length, 1);
+  // Compaction or resume mid-run re-checks in a linked worktree, so the verdict is there at close.
+  for (const source of ["compact", "resume"]) {
+    const restarted = context(await f.run({ cwd: p.linked, source }, { execFileImpl: p.execFileImpl }));
+    assert.equal(publishBlock(restarted), '<dev-publish at="session-start">\npr: available\nremote: origin\nhost: github.com\nbase: main\n</dev-publish>');
+  }
+  assert.equal(p.calls.length, 3);
+  // The main worktree never re-checks.
+  assert.ok(!context(await f.run({ cwd: p.repo.root, source: "compact" }, { execFileImpl: p.execFileImpl })).includes("<dev-publish"));
+  assert.equal(p.calls.length, 3);
+});
+
+test("the publish block names the one reason a pull request cannot be opened", async (t) => {
+  const f = await fixture(t);
+  const reason = async (options, { fromMain = false } = {}) => {
+    const p = await publishable(t, options);
+    const text = context(await f.run(skillStart("dev:execute-plan", fromMain ? p.repo.root : p.linked), { execFileImpl: p.execFileImpl }), "PreToolUse");
+    const block = publishBlock(text);
+    assert.ok(block.startsWith('<dev-publish at="dev:execute-plan">\npr: unavailable\nreason: '), block);
+    return { p, value: block.split("\n")[2].slice(8) };
+  };
+  assert.equal((await reason({}, { fromMain: true })).value, "not in a linked worktree");
+  assert.equal((await reason({ url: "/srv/git/repo.git" })).value, "remote origin has no network host");
+  assert.equal((await reason({ url: "file:///srv/git/repo.git" })).value, "remote origin has no network host");
+  assert.equal((await reason({ ghResult: "missing" })).value, "gh is not installed");
+  assert.equal((await reason({ ghResult: "denied" })).value, "gh is not authenticated for github.com");
+  assert.equal((await reason({ ghResult: "hanging" })).value, "gh auth status could not be run");
+  // An SSH alias is reported under the host it parsed to, so the user can tell why gh refused it.
+  assert.equal((await reason({ url: "git@github-work:owner/repo.git", ghResult: "denied" })).value, "gh is not authenticated for github-work");
+  // A hostile URL never reaches gh or the block.
+  const hostile = await reason({ url: "https://x@evil\u001b[0m.com/a" });
+  assert.equal(hostile.value, "remote origin has no network host");
+  assert.deepEqual(hostile.p.calls, []);
+  const plain = await mkdtemp(join(tmpdir(), "dev-plain-"));
+  t.after(() => rm(plain, { recursive: true, force: true }));
+  assert.ok(context(await f.run(skillStart("dev:execute-plan", plain)), "PreToolUse").endsWith("pr: unavailable\nreason: not in a git repository\n</dev-publish>"));
+});
+
+test("an untracked main branch or a detached linked worktree makes no guess at the base", async (t) => {
+  const f = await fixture(t);
+  const p = await publishable(t);
+  await p.repo.git("config", "--unset", "branch.main.merge");
+  let text = context(await f.run(skillStart("dev:execute-plan", p.linked), { execFileImpl: p.execFileImpl }), "PreToolUse");
+  assert.ok(text.endsWith("pr: unavailable\nreason: main worktree branch main tracks no remote branch\n</dev-publish>"));
+  await execFileAsync("git", ["-C", p.linked, "switch", "-q", "--detach"]);
+  text = context(await f.run(skillStart("dev:execute-plan", p.linked), { execFileImpl: p.execFileImpl }), "PreToolUse");
+  assert.ok(text.endsWith("pr: unavailable\nreason: detached HEAD\n</dev-publish>"));
+  assert.deepEqual(p.calls, []);
 });
 
 test("session start injects the shipped working principles ahead of workspace and orchestrator facts", async (t) => {
