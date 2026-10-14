@@ -37,7 +37,7 @@ This section is the canonical definition of execution modes: upstream departure 
 
 Two modes, in default preference order:
 
-1. **Subagent delegation (preferred)**: dispatch implementation to the host's generic subagent on a Claude tier — `opus` by default, `fable` when the user chooses it — passed as the `model` argument where the host supports that alias; otherwise omit the override and use the host's default model. Available whenever the host has a subagent/task-spawning tool (such as Claude Code's `Agent` tool or an equivalent). The subagent runs inside the host's existing permission envelope — no extra consent needed — and keeps the orchestrator's context free for review.
+1. **Subagent delegation (preferred)**: dispatch implementation to the host's generic subagent on a Claude tier — `opus` by default, `sonnet` or `fable` when the user chooses it — passed as the `model` argument where the host supports that alias; otherwise omit the override and use the host's default model. Available whenever the host has a subagent/task-spawning tool (such as Claude Code's `Agent` tool or an equivalent). The subagent runs inside the host's existing permission envelope — no extra consent needed — and keeps the orchestrator's context free for review.
 2. **Self-execution**: implement directly. Always available; the fallback when the host has no subagent tool, or the right choice when implementation genuinely needs the orchestrator's full capability.
 
 Selection rules:
@@ -49,13 +49,16 @@ Selection rules:
 
 If a recorded or default delegation preference cannot be supported by the host, use self-execution and say so in the final report: the same host permission envelope is retained and no new consent boundary is crossed. A tier alias the host does not support is dispatched to the generic subagent without the override, on the host's default model, and the report says so. Never dispatch any other agent type for implementation, never infer host support from a Claude-specific example, and never run model discovery or launch probe agents from this skill.
 
-The **execution-mode question** — asked here under selection rule 4, and by upstream departure checks that read this section — offers exactly these options:
+The **execution-mode question** — asked here under selection rule 4, and by upstream departure checks that read this section — offers exactly these options, ordered by tier:
 
-1. **Subagent (opus)** (recommended) — the host's generic subagent with `model: opus`.
-2. **Subagent (fable)** — the host's generic subagent with `model: fable`, for implementation that needs the top tier.
-3. **Self** — self-execution.
+1. **Subagent (sonnet)** — the host's generic subagent with `model: sonnet`, for mechanical, well-specified implementation.
+2. **Subagent (opus)** — the host's generic subagent with `model: opus`, for ordinary implementation that needs judgment.
+3. **Subagent (fable)** — the host's generic subagent with `model: fable`, for implementation that needs the top tier.
+4. **Self** — self-execution.
 
-Record the answer as `subagent(opus)`, `subagent(fable)`, or `self`. Outside this question, offer the options again only when the user asks to change the mode or an actual blocker requires a replacement; retain an existing selection unless the user changes it.
+No option is recommended by default. Whoever asks — the departure check in `dev:explore` or `dev:write-plan`, or this skill under selection rule 4 — marks one subagent option `(recommended)` by the difficulty of the task at hand, using the tier descriptions above; when unsure, recommend opus. Self is never the recommended option.
+
+Record the answer as `subagent(sonnet)`, `subagent(opus)`, `subagent(fable)`, or `self`. Outside this question, offer the options again only when the user asks to change the mode or an actual blocker requires a replacement; retain an existing selection unless the user changes it.
 
 ### 3. Preflight
 
@@ -163,7 +166,7 @@ Report:
 
 ```text
 Status: COMPLETE | STOPPED | APPROVE | REVISE | BLOCK
-Mode: self | subagent(opus) | subagent(fable)
+Mode: self | subagent(sonnet) | subagent(opus) | subagent(fable)
 Packages: one | <name>: <owned paths> — <worktree>, <branch> — <status>; ... — merge order: ...
 Evidence: validation results, scope check, diff/test review
 Changed files: ...

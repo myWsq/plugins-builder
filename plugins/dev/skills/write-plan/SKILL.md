@@ -95,7 +95,7 @@ Use this structure:
 - Risk: LOW | MED | HIGH
 - Depends on: none | wiki/plans/YYYYMMDD-*.md
 - Category: bug | feature | tests | refactor | docs | dx | migration
-- Execution: subagent(opus) | subagent(fable) | self | deferred — from the departure check; `deferred` only when no check settled it, and `dev:execute-plan` resolves it at dispatch
+- Execution: subagent(sonnet) | subagent(opus) | subagent(fable) | self | deferred — from the departure check; `deferred` only when no check settled it, and `dev:execute-plan` resolves it at dispatch
 - Stop after: plan | implementation — from the departure check's autopilot item (review pause means `plan`; plan audit means `implementation`)
 - Plan review: none | audit — from the departure check's autopilot item; `audit` means step 5 ran before handoff, or notes why it was skipped
 - Workspace: isolated | current — from the inspected workspace: `isolated` when step 3 moved the session, `current` when it was already in a linked worktree or the user asked to stay
