@@ -49,14 +49,14 @@ Selection rules:
 
 If a recorded or default delegation preference cannot be supported by the host, use self-execution and say so in the final report: the same host permission envelope is retained and no new consent boundary is crossed. A tier alias the host does not support is dispatched to the generic subagent without the override, on the host's default model, and the report says so. Never dispatch any other agent type for implementation, never infer host support from a Claude-specific example, and never run model discovery or launch probe agents from this skill.
 
-The **execution-mode question** — asked here under selection rule 4, and by upstream departure checks that read this section — offers exactly these options, ordered by tier:
+The **execution-mode question** — asked here under selection rule 4, and by upstream departure checks that read this section — offers exactly these options, listed here by tier:
 
 1. **Subagent (sonnet)** — the host's generic subagent with `model: sonnet`, for mechanical, well-specified implementation.
 2. **Subagent (opus)** — the host's generic subagent with `model: opus`, for ordinary implementation that needs judgment.
 3. **Subagent (fable)** — the host's generic subagent with `model: fable`, for implementation that needs the top tier.
 4. **Self** — self-execution.
 
-No option is recommended by default. Whoever asks — the departure check in `dev:explore` or `dev:write-plan`, or this skill under selection rule 4 — marks one subagent option `(recommended)` by the difficulty of the task at hand, using the tier descriptions above; when unsure, recommend opus. Self is never the recommended option.
+No option is recommended by default. Whoever asks — the departure check in `dev:explore` or `dev:write-plan`, or this skill under selection rule 4 — marks one subagent option `(recommended)` by the difficulty of the task at hand, using the tier descriptions above; when unsure, recommend opus. Self is never the recommended option. Present the recommended option first, then the others in the tier order above.
 
 Record the answer as `subagent(sonnet)`, `subagent(opus)`, `subagent(fable)`, or `self`. Outside this question, offer the options again only when the user asks to change the mode or an actual blocker requires a replacement; retain an existing selection unless the user changes it.
 
