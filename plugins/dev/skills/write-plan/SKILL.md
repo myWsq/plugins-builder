@@ -79,7 +79,7 @@ Say in one line where the work now lives — the absolute worktree path and the 
    - **Execution brief** — the executor, and none of anyone else's concerns: no status fields, no validation commands, no merge notes. Whatever it needs to implement correctly is restated here in its own terms, since it receives this part alone.
    - **Verification** — the orchestrator: milestone validations, commands, done criteria, merge and deploy notes.
 5. Size the brief by the plan's `Execution:` value — the reader it is written for:
-   - `subagent(sonnet)`: one task per edit site. Run the searches yourself and list every site; never write "there may be others". Each task must apply without design work: for prose, the replacement text or the phrases it must contain; for code, the signatures and behaviour, and the tests to write as input → expected.
+   - `subagent(sonnet)`: one task per edit site. Run the searches yourself and list every site; never write "there may be others". Give each site its target state — the behaviour or output, the invariant it must hold, the tests to write as input → expected — and leave the code that reaches it to the executor. Write code or exact text only where the decision lives at that level: an order of checks, whether a key exists, a format string or user-facing text the requirement fixes. The brief locates and constrains the change; it does not write it a second time.
    - `subagent(opus)`, `subagent(fable)`, `self`, or `deferred`: one task per milestone outcome, naming its files, the constraints that govern it, and the target state; the edits inside it are the executor's design. `dev:execute-plan` refines the brief before dispatching a lower tier than it was written for.
 6. Write every task so that a literal reading lands on the right change:
    - Anchor it with a quoted line, a heading, or a symbol name, not a bare line number: earlier tasks shift the lines.
@@ -168,7 +168,7 @@ Depends on: none | Milestone N
 
 - Where: `<path>` — <anchor: a quoted line, a heading, or a symbol name>
 - Change: <what to do, in the imperative>
-- After: <the target state: exact text or the phrases it must contain; a signature and its behaviour; tests as input → expected>
+- After: <the target state: behaviour or output, the invariant it holds, tests as input → expected; exact code or text only where the decision lives there>
 - Don't: <a tempting wrong move> (D<n>) — omit the line when there is none
 
 State how the milestones depend on each other, and say so when they are
@@ -272,7 +272,7 @@ Skip it as well when the latest injected `<dev-orchestrator>` block (in Claude C
 Before finishing, check each part against its reader:
 
 - **Record**: a reader months later, with the code changed, can tell what was decided, what was rejected and why, and how the conversation got there.
-- **Execution brief**: an executor at the recorded tier, given this part alone, can apply every task without making a decision Your call does not leave to it, and following the tasks literally produces the right change rather than an adjacent wrong one. Every decision that governs a task appears on that task.
+- **Execution brief**: an executor at the recorded tier, given this part alone, finds every site and knows each one's target state without making a decision Your call does not leave to it, and following the tasks literally produces the right change rather than an adjacent wrong one. Every decision that governs a task appears on that task. Writing the code that reaches a stated target state is the executor's work, not a decision; a brief that restates the whole diff in prose pays for the implementation twice.
 - **Verification**: every done criterion is checkable by a command or by reading the diff, and would fail on a wrong implementation.
 
 Hold each entry in Decisions & tradeoffs to a no-reasonable-misreading bar: an unreported deviation from a decision fails review, so the wording must not leave room for a good-faith reading that lands somewhere unintended. The cheapest test: check that the rejected alternative is actually excluded by the words, not merely disfavored. If a decision cannot be written that precisely, it is not settled — resolve it, or explicitly delegate it under Your call.
