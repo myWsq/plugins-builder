@@ -63,7 +63,7 @@ Read enough to understand the relevant terrain:
 
 ### 4. Clarify the design (grill by default)
 
-If the user has a proposed change, grill the technical decisions until the direction holds up — but settle only the decisions worth settling before code is written. Design to the depth the risk demands and no deeper: a decision belongs here when reversing it later would be expensive, or when a competent implementer working from the live code and conventions could reasonably choose differently and the difference matters. Everything else is the executor's call, and the direction says so explicitly. Resolve dependencies between the decisions you do settle one by one, and give each question your recommended answer. For a perceptible change, the product conclusions confirmed in step 2 are settled input: grill the technical decisions only.
+If the user has a proposed change, grill the technical decisions until the direction holds up — but settle only the decisions worth settling before code is written. Design to the depth the risk demands and no deeper: a decision belongs here when reversing it later would be expensive, or when a competent implementer working from the live code and conventions could reasonably choose differently and the difference matters. Everything else is left to implementation — settled in the plan's execution brief, or left there as the executor's call — and the direction says so explicitly. Resolve dependencies between the decisions you do settle one by one, and give each question your recommended answer. For a perceptible change, the product conclusions confirmed in step 2 are settled input: grill the technical decisions only.
 
 Ask the questions one at a time, waiting for feedback on each question before continuing. Asking multiple questions at once is bewildering. If a question can be answered by exploring the codebase, explore the codebase instead.
 
@@ -77,7 +77,7 @@ Grilling adapted from [mattpocock/skills](https://github.com/mattpocock/skills/b
 
 Compare approaches only where a real fork exists — where the code and conventions leave more than one sane path and the choice matters. Then lead with the recommended one and why, with practical trade-offs rather than generic pros and cons, scoped to the current goal and following existing project patterns unless there is a concrete reason to change them. Where there is one sane path, say so and move on; do not manufacture alternatives.
 
-State the direction the way an experienced architect would: as short as the risk allows — one sentence for a narrow change, a few decisions for a feature, a picture of the boundaries only when the change reshapes them. Each settled decision sits at the altitude of the invariant, boundary, or contract it fixes, worded precisely enough that the rejected alternative is excluded, never as the edit that implements it. Name what is deliberately left to the executor, so an omission cannot be mistaken for a gap.
+State the direction the way an experienced architect would: as short as the risk allows — one sentence for a narrow change, a few decisions for a feature, a picture of the boundaries only when the change reshapes them. Each settled decision sits at the altitude of the invariant, boundary, or contract it fixes, worded precisely enough that the rejected alternative is excluded, never as the edit that implements it. Name what is deliberately left to implementation, so an omission cannot be mistaken for a gap.
 
 Converge on the direction in chat; if the user disagrees, revise and continue the discussion. Final approval happens once, in the departure check.
 
@@ -86,7 +86,7 @@ Converge on the direction in chat; if the user disagrees, revise and continue th
 Report what the next step needs and nothing more.
 
 - For pure exploration, that is what the user asked — typically the relevant files and their roles, exact validation commands, conventions with `file:line` examples, existing design decisions, and risks, gaps, or broken validation baselines.
-- For a proposed change, it is what `dev:write-plan` will have to write down and cannot derive: the product conclusions for a perceptible change, the clarified requirement, the settled decisions with their evidence, what is left to the executor, landmines, scope, and validation commands.
+- For a proposed change, it is what `dev:write-plan` will have to write down and cannot derive: the product conclusions for a perceptible change, the clarified requirement, the settled decisions with their evidence, the questions put to the user with the options and answers (the plan's Discussion log), what is left to implementation, landmines, scope, and validation commands.
 - For a plan stress-test: revision notes keyed to the plan's sections, and whether the plan is safe to execute as written.
 
 For pure exploration, a discussion that ends in chat, or a plan stress-test, stop after the report. For a proposed change the user wants planned or implemented, run the departure check once the direction is clear enough for planning.
