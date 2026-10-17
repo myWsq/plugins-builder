@@ -158,7 +158,9 @@ What future maintainers or reviewers should watch.
 ### Goal
 
 What changes and why, in a few sentences — enough for the executor to make
-sense of the tasks — and the architecture and conventions to follow.
+sense of the tasks — and the architecture and conventions to follow,
+including the formatter command it runs on the files it changes when the
+project has one (the format check itself belongs under Verification).
 
 ### Milestone 1: <outcome>
 

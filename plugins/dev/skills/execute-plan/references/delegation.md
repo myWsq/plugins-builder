@@ -18,9 +18,10 @@ The prompt contains:
    > - Decide only what the brief's Your call leaves to you. When anything else is unclear, or a condition under Stop and report if occurs, stop and report — do not guess, and do not look for the answer elsewhere in the plan file: its other parts are written for the orchestrator.
    > - Follow every constraint on a task. If you must deviate, say so and justify it in your report.
    > - Change only in-scope files. Do not edit anything under `wiki/plans/`.
+   > - Before each commit, run the project's formatter on the files you changed — the brief's Goal names it when the project has one (for example `gofmt -w <files>` or `prettier --write <files>`). Formatting is part of writing the code, not a check. Format only those files.
    > - Run **no validation commands**: no unit tests, no typecheck, no lint, no e2e or UI suites, no verify skill or verify-fix loops, nothing that launches the app. Verification happens outside this session; failures come back to you as concrete revision feedback.
    > - Do not consult an advisor or any other second-opinion tool the host provides, even where the host's own guidance says to.
-   > - Do nothing beyond the tasks: no formatting sweeps, no refactors outside scope, no doc updates the brief does not ask for.
+   > - Do nothing beyond the tasks: no repository-wide formatting sweeps, no refactors outside scope, no doc updates the brief does not ask for.
    > - When finished, report: for each task, done, deviated (what and why), or not done (why); the choices you made under Your call; your commits; and anything merging or deploying now needs that the brief does not mention — a new environment variable (by name only), a migration, a configuration or flag change. Do not claim the code works — verifying it is not your job.
 
 2. The plan's Execution brief, verbatim — never the other parts: the Record's rejected alternatives invite the wrong change, and Verification's commands are ones the executor must not run.
@@ -68,6 +69,6 @@ For REVISE, dispatch a prompt containing:
 - the baseline SHA, with an instruction to run `git diff <baseline>..HEAD` itself to see its previous work — do not paste large diffs into the prompt;
 - for a concurrent unit, the absolute worktree path and branch, with the instruction to switch into it first — a continued subagent is not guaranteed to resume where it left off; after the round, confirm the new commits landed on that branch;
 - instruction to fix in place on that branch and commit;
-- the same executor rules as the first dispatch: implementation only, no validation commands, no advisor, and the package brief when there is one.
+- the same executor rules as the first dispatch: implementation only, the formatter on changed files, no validation commands, no advisor, and the package brief when there is one.
 
 Allow at most two revision rounds per unit before BLOCK; the serial fallback dispatch has two rounds of its own.
