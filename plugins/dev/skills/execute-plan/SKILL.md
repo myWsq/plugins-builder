@@ -28,7 +28,7 @@ A plan has three parts: the Record (why — requirement, decisions, the discussi
 ### 1. Locate and read the plan
 
 - Use the user-provided plan id or path, or pick the next TODO plan from `wiki/plans/README.md`.
-- Read the full plan and any listed prerequisite plans. Read `Execution:`, `Stop after:`, and `Workspace:` when present, together with the current user request — they record what the departure check settled and where the planner put the work. Fields missing from an older plan are resolved through the start contract, falling back to the execution-mode question below only when no departure check ever ran. A current request to execute supersedes an older plan-only endpoint; without execution authorization, stop at the recorded endpoint.
+- Read the full plan and any listed prerequisite plans. Read `Execution:`, `Stop after:`, and `Workspace:` when present, together with the current user request — they record what the departure check settled and where the planner put the work. Fields missing from an older plan are resolved through the start contract, falling back to the execution-mode question below only when no departure check ever ran. A `Stop after: plan` recorded by an older plan is superseded by the request to execute it.
 - Stop if a prerequisite is not DONE.
 - A plan written before the three-part format has no Execution brief; preflight writes one before a delegated dispatch (step 3), and the rest of the plan serves as its Record and Verification.
 
