@@ -16,3 +16,4 @@ Plans are named `YYYYMMDD-short-slug`. The numbered entries (003–009) predate 
 | [20260905-execute-work-packages](20260905-execute-work-packages.md) | DONE | self | none |
 | [20261014-sonnet-execution-mode](20261014-sonnet-execution-mode.md) | DONE | self (sonnet unavailable on host) | none |
 | [20261014-risk-based-plan-review](20261014-risk-based-plan-review.md) | DONE | subagent (opus) | none |
+| [20261109-audit-by-named-risk](20261109-audit-by-named-risk.md) | TODO | subagent (fable) | none |
