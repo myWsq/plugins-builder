@@ -346,3 +346,11 @@ Out of scope:
 Releasing is separate: after merge, `npm version minor` (or as appropriate)
 and `git push origin main --follow-tags` publish dev 0.32.0. Installed copies
 keep the old rule until the user updates the plugin.
+
+## Outcome
+
+- Status: APPROVE — 2026-11-09
+- Mode: subagent(fable)
+- Commits: `a8173c5..79f011f`
+- Deviations: none. Under Your call the executor dropped "with `Stop after: implementation` unchanged" from step 5's top-tier skip paragraph, worded T2's no-plan-endpoint sentence as "No endpoint stops the chain once a plan is written.", and listed plain autopilot first in the explore item as the default recommendation.
+- Follow-ups: no headless departure-check run was done; the new recommendation is observable only after installing dev 0.32.0. Release (`npm version`, tag) is separate.
