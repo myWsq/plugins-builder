@@ -1,0 +1,10 @@
+{
+  "name": "gpt-image",
+  "category": "design",
+  "origin": {
+    "repository": "https://github.com/myWsq/GPT-Image2-Skill.git",
+    "path": ".",
+    "ref": "claude-plugin",
+    "sha": "ad313256a1485cbcbe46b9e2eed8aab4ba0cbade"
+  }
+}

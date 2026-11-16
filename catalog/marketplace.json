@@ -9,7 +9,8 @@
     "dev",
     "git",
     "arch",
-    "market"
+    "market",
+    "gpt-image"
   ],
   "removed": [
     "commit",
