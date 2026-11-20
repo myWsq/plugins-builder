@@ -224,3 +224,11 @@ Out of scope:
 
 Shipping to the marketplace needs a builder release after merge: `npm version
 minor` (or patch) on `main` and `git push origin main --follow-tags`.
+
+## Outcome
+
+- Status: COMPLETE — 2026-11-20
+- Mode: self
+- Commits: `36579ad..1e0efee`
+- Deviations: the "Leftover wording" grep still matches "opus when unsure" twice — in the task-tier step of the canonical rule and in `docs/dev.md` — which is the difficulty fallback the plan keeps (D2), not the old final recommendation; the grep pattern was broader than intended. T1 also drops the old note that delegation "keeps the orchestrator's context free for review", which argued for delegation as the preferred mode.
+- Follow-ups: a builder release (`npm version`, push with tags) after merge ships dev 0.33.0 to the marketplace.
